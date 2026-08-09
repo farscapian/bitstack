@@ -1,0 +1,3 @@
+[submodule ".agentstack"]
+	path = .agentstack
+	url = git@github.com:farscapian/agentstack.git
