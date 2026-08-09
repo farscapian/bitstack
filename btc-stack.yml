@@ -1,0 +1,50 @@
+# Interpolated at deploy time from the environment:
+#   BITCOIN_VERSION  ELECTRS_VERSION  BITCOIN_DIR
+services:
+  bitcoind:
+    image: local/bitcoind:${BITCOIN_VERSION}
+    command: ["-datadir=${BITCOIN_DIR}"]
+    volumes:
+      - ${BITCOIN_DIR}:${BITCOIN_DIR}
+    ports:
+      - target: 8333
+        published: 8333
+        protocol: tcp
+        mode: host          # preserve real peer IPs
+    networks: [btc]
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: any
+
+  electrs:
+    image: local/electrs:${ELECTRS_VERSION}
+    command:
+      - --network=bitcoin
+      - --daemon-dir=${BITCOIN_DIR}
+      - --daemon-rpc-addr=bitcoind:8332
+      - --daemon-p2p-addr=bitcoind:8333
+      - --electrum-rpc-addr=0.0.0.0:50001
+      - --db-dir=/var/lib/electrs
+      - --log-filters=INFO
+    volumes:
+      - ${BITCOIN_DIR}:${BITCOIN_DIR}:ro   # read the .cookie only
+      - electrs-db:/var/lib/electrs
+    ports:
+      - target: 50001
+        published: 50001
+        protocol: tcp
+        mode: host          # bound on host; Sparrow reaches 127.0.0.1:50001
+    networks: [btc]
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: any
+
+networks:
+  btc:
+    driver: overlay
+    attachable: true
+
+volumes:
+  electrs-db:
