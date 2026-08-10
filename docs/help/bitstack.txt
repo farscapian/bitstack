@@ -1,7 +1,8 @@
 bitstack -- control the bitcoind + electrs docker-swarm stack
 
-Run from the bitstack repo root, as user 'derek'. Requires ./setup.sh to have
-installed docker and built the local/bitcoind and local/electrs images first.
+Run from the bitstack repo root, as your regular login user (not root).
+Requires ./setup.sh to have installed docker and built the local/bitcoind
+and local/electrs images first.
 
 Commands:
 

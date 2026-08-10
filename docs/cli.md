@@ -28,5 +28,6 @@ version resolution, stack-state helpers) lives in
 [scripts/bitstack-common.sh](../scripts/bitstack-common.sh), sourced by both
 entry points.
 
-Both scripts must run as the configured node user (`derek`), never as root --
-they call `sudo` themselves for the privileged steps (apt, docker).
+Both scripts must run as the configured node user (`BITSTACK_NODE_USER`,
+defaults to the invoking user), never as root -- they call `sudo` themselves
+for the privileged steps (apt, docker).

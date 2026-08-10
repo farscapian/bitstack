@@ -9,7 +9,7 @@
 
 : "${BITSTACK_ROOT:?bitstack-common.sh: BITSTACK_ROOT must be set before sourcing}"
 
-BITSTACK_NODE_USER="derek"
+BITSTACK_NODE_USER="${BITSTACK_NODE_USER:-$(id -un)}"
 BITSTACK_NODE_HOME="/home/${BITSTACK_NODE_USER}"
 BITSTACK_BITCOIN_DIR="${BITSTACK_NODE_HOME}/.bitcoin"      # bind-mounted into containers
 BITSTACK_STACK_NAME="btc"
@@ -25,7 +25,12 @@ BITSTACK_SIBLINGS=(bitcoind.Dockerfile electrs.Dockerfile btc-stack.yml bitcoin.
 
 # Fail unless invoked as BITSTACK_NODE_USER (needs sudo for docker/apt, but must
 # not run as root itself -- matches the original deploy-bitcoin-node.sh guard).
+# BITSTACK_NODE_USER defaults to the invoking user; set it explicitly to pin
+# node ownership to a different account.
 bitstack_require_node_user() {
+  [[ "${BITSTACK_NODE_USER}" != "root" ]] || {
+    err "Run this as a regular user (needs sudo), not as root."
+  }
   [[ "$(id -un)" == "${BITSTACK_NODE_USER}" ]] || {
     err "Run this as ${BITSTACK_NODE_USER} (needs sudo), not as $(id -un)."
   }

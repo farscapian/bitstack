@@ -5,7 +5,7 @@
 # with no arguments) for the command catalog. First-time dependency install
 # (docker, swarm, images, Sparrow) is ./setup.sh, not this script.
 #
-# Run as user 'derek' (needs sudo). Not root.
+# Run as your regular login user (needs sudo). Not root.
 
 set -euo pipefail
 

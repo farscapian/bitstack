@@ -14,7 +14,7 @@
 # to consume. Reads these sibling files from its own directory:
 #   bitcoind.Dockerfile  electrs.Dockerfile  bitcoin.conf  sparrow-config.json
 #
-# Run as user 'derek' (needs sudo). Not root. Deploying/stopping/resetting the
+# Run as your regular login user (needs sudo). Not root. Deploying/stopping/resetting the
 # stack itself is bitstack.sh's job (bitstack up / down / reset) -- this script
 # only installs and builds.
 
