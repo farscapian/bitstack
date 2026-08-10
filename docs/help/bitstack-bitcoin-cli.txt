@@ -1,0 +1,26 @@
+bitstack bitcoin-cli -- run bitcoin-cli against the running bitcoind container
+
+Usage:
+  bitstack bitcoin-cli [bitcoin-cli args...]
+
+What it does:
+  Finds the running bitcoind container for the 'btc' stack and runs
+  bitcoin-cli inside it (docker exec), using the same datadir the node
+  was started with, so cookie auth just works.
+
+  Every argument is forwarded to bitcoin-cli unchanged -- flags, the RPC
+  command, and its parameters. This wrapper does NOT intercept 'help' as
+  a bitstack help topic the way other commands do, because bitcoin-cli
+  has its own 'help' RPC (lists or describes RPC commands):
+
+    bitstack bitcoin-cli help
+    bitstack bitcoin-cli help getblockchaininfo
+    bitstack bitcoin-cli getblockchaininfo
+    bitstack bitcoin-cli -rpcwallet=mywallet getbalance
+
+Requires the stack to be running ('bitstack up' first).
+
+Help (for this wrapper itself, not bitcoin-cli):
+  bitstack help bitcoin-cli
+
+See also: docs/help/bitstack-up.txt

@@ -19,6 +19,12 @@ Two entry points at the repo root, replacing the old `deploy-bitcoin-node.sh`:
     `~/.bitcoin/*`. Requires two interactive confirmations before deleting
     `blocks/`, `chainstate/`, or `wallets/` (or `-f/--force` to skip, for
     scripted use)
+  - `bitstack bitcoin-cli [args...]` -- run `bitcoin-cli` inside the running
+    bitcoind container (`docker exec`, same datadir as the node, so cookie
+    auth just works). All arguments are forwarded verbatim to `bitcoin-cli`;
+    unlike the other subcommands this one does NOT intercept a bare `help`
+    argument, since `bitcoin-cli help` is itself a real RPC command. Use
+    `bitstack help bitcoin-cli` for this wrapper's own help.
 
 Terminal help: `bitstack help`, `bitstack <command> help`, or
 `bitstack help <command>` -- see `docs/help/bitstack*.txt`.

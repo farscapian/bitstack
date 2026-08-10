@@ -88,6 +88,14 @@ bitstack_stack_exists() {
   sudo docker stack ls --format '{{.Name}}' 2>/dev/null | grep -qx "${BITSTACK_STACK_NAME}"
 }
 
+# Container ID of the running bitcoind swarm task, or empty if none.
+bitstack_bitcoind_container() {
+  sudo docker ps \
+    --filter "label=com.docker.swarm.service.name=${BITSTACK_STACK_NAME}_bitcoind" \
+    --filter "status=running" \
+    --format '{{.ID}}' | head -n1
+}
+
 # Wait (best-effort) for every service in the stack's namespace to disappear
 # after 'docker stack rm', so a caller that deletes volumes/data next does not
 # race a still-terminating container.

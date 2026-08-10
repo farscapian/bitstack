@@ -39,6 +39,7 @@ usage()       { cat_help bitstack.txt; }
 help_up()     { cat_help bitstack-up.txt; }
 help_down()   { cat_help bitstack-down.txt; }
 help_reset()  { cat_help bitstack-reset.txt; }
+help_bitcoin_cli() { cat_help bitstack-bitcoin-cli.txt; }
 
 bitstack_help_topic() {
   case "${1:-}" in
@@ -46,6 +47,7 @@ bitstack_help_topic() {
     up)    help_up ;;
     down)  help_down ;;
     reset) help_reset ;;
+    bitcoin-cli) help_bitcoin_cli ;;
     *) err "bitstack: unknown help topic: ${1} (try: bitstack help)" ;;
   esac
 }
@@ -180,6 +182,27 @@ cmd_reset() {
   ok "Reset complete. Run 'bitstack up' to redeploy a fresh node."
 }
 
+# Passthrough wrapper: forwards every argument verbatim to bitcoin-cli inside
+# the running bitcoind container. Deliberately does NOT intercept "help" as a
+# bitstack help topic here (unlike the other cmd_* functions) because
+# bitcoin-cli has its own 'help' RPC (lists/describes RPC commands) -- 'bitstack
+# bitcoin-cli help getblockchaininfo' must reach bitcoin-cli unchanged. Use
+# 'bitstack help bitcoin-cli' for this wrapper's own help instead.
+cmd_bitcoin_cli() {
+  bitstack_require_node_user
+  bitstack_stack_exists || err "Stack '${BITSTACK_STACK_NAME}' is not running -- run 'bitstack up' first."
+
+  local container
+  container="$(bitstack_bitcoind_container)"
+  [[ -n "$container" ]] \
+    || err "bitcoind container not found (stack up but service not ready?) -- check: sudo docker service ps ${BITSTACK_STACK_NAME}_bitcoind"
+
+  local -a tty_flags=(-i)
+  [[ -t 0 && -t 1 ]] && tty_flags=(-it)
+
+  sudo docker exec "${tty_flags[@]}" "$container" bitcoin-cli -datadir="${BITSTACK_BITCOIN_DIR}" "$@"
+}
+
 main() {
   local argv=()
   _as_cli_parse_global_flags argv "$@"
@@ -196,6 +219,7 @@ main() {
     up)    shift; cmd_up "$@" ;;
     down)  shift; cmd_down "$@" ;;
     reset) shift; cmd_reset "$@" ;;
+    bitcoin-cli) shift; cmd_bitcoin_cli "$@" ;;
     *) err "Unknown command: ${cmd}. Try 'bitstack help'" ;;
   esac
 }

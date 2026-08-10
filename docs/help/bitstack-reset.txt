@@ -26,4 +26,5 @@ Help:
   bitstack reset help
   bitstack help reset
 
-See also: docs/help/bitstack-up.txt, docs/help/bitstack-down.txt
+See also: docs/help/bitstack-up.txt, docs/help/bitstack-down.txt,
+docs/help/bitstack-bitcoin-cli.txt
