@@ -41,6 +41,19 @@ services:
       restart_policy:
         condition: any
 
+  tor:
+    image: local/tor:latest
+    # No published ports: this container only publishes the electrs Electrum
+    # RPC port as a Tor hidden service (see torrc). Clients reach it with
+    # their own Tor client -- see 'bitstack wallet' / 'bitstack tor'.
+    volumes:
+      - tor-hidden-service:/var/lib/tor/hidden_service
+    networks: [btc]
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: any
+
 networks:
   btc:
     driver: overlay
@@ -48,3 +61,4 @@ networks:
 
 volumes:
   electrs-db:
+  tor-hidden-service:

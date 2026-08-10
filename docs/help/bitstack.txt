@@ -6,10 +6,12 @@ and local/electrs images first.
 
 Commands:
 
-  up                  deploy the bitcoind + electrs stack
+  up                  deploy the bitcoind + electrs + tor stack
   down                stop the stack; node data is left in place
   reset               stop the stack and DELETE all node data (~/.bitcoin/*)
   bitcoin-cli         run bitcoin-cli against the running bitcoind container
+  tor                 show the Tor onion address for electrs' Electrum RPC
+  wallet              launch Sparrow (local if co-resident, else onion)
 
 Use 'bitstack <command> help' for detailed help on any command.
 Use 'bitstack help <command>' as an equivalent form.
@@ -23,4 +25,5 @@ Global Options (valid anywhere on the command line):
 First-time setup (dependencies, images, Sparrow wallet): ./setup.sh
 
 See also: docs/help/bitstack-up.txt, docs/help/bitstack-down.txt,
-docs/help/bitstack-reset.txt, docs/help/bitstack-bitcoin-cli.txt
+docs/help/bitstack-reset.txt, docs/help/bitstack-bitcoin-cli.txt,
+docs/help/bitstack-tor.txt, docs/help/bitstack-wallet.txt

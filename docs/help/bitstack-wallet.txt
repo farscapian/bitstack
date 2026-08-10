@@ -1,0 +1,34 @@
+bitstack wallet -- launch Sparrow, pointed at electrs
+
+Usage:
+  bitstack wallet
+  bitstack wallet local
+  bitstack wallet onion
+
+What it does:
+  Picks an Electrum server for Sparrow and launches it, patching
+  ~/.sparrow/config in place (every other Sparrow preference -- wallet list,
+  theme, etc. -- is left untouched):
+
+    local  -- tcp://127.0.0.1:50001, direct connection to electrs
+    onion  -- electrs' Tor hidden service address (see: bitstack help tor)
+
+  With no argument, auto-detects: 'local' when something is listening on
+  127.0.0.1:50001 (electrs is co-resident with this host), 'onion'
+  otherwise -- e.g. running this on a separate client machine that only has
+  Sparrow installed.
+
+  Connecting over onion needs no manual Tor/proxy setup: Sparrow detects the
+  .onion address in the server URL and starts its own bundled Tor client
+  automatically.
+
+Requires Sparrow to be installed (./setup.sh) and jq (also installed by
+setup.sh). For 'onion' (or auto-detect falling back to it), a known onion
+address is required too -- run 'bitstack up' or 'bitstack tor' on the
+electrs host first (see: docs/help/bitstack-tor.txt).
+
+Help:
+  bitstack wallet help
+  bitstack help wallet
+
+See also: docs/help/bitstack-tor.txt, docs/help/bitstack-up.txt

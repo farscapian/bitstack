@@ -1,2 +1,6 @@
 # Machine-local state written by setup.sh, consumed by bitstack.sh up.
 /.bitstack-versions
+
+# Machine-local cache of the last-known Tor onion address, written by
+# 'bitstack up'/'bitstack tor', consumed by 'bitstack wallet'.
+/.bitstack-onion

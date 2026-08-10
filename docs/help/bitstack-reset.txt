@@ -14,6 +14,10 @@ This is destructive. For a fully-validating node it means a full re-sync
 (hours to days) after the next 'bitstack up'. If wallets/ holds an unbacked
 wallet, any funds in it become UNRECOVERABLE.
 
+The Tor hidden-service key (and so the onion address) is untouched -- it
+lives in a separate docker volume that 'bitstack reset' does not remove.
+See: docs/help/bitstack-tor.txt
+
 Confirmation:
   Interactive runs require TWO confirmations before step 3 deletes
   blocks/chainstate/wallets: a yes/no prompt naming what will be lost, then

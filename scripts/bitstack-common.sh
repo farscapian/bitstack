@@ -15,13 +15,17 @@ BITSTACK_BITCOIN_DIR="${BITSTACK_NODE_HOME}/.bitcoin"      # bind-mounted into c
 BITSTACK_STACK_NAME="btc"
 BITSTACK_SPARROW_DIR="/opt/sparrow"
 BITSTACK_VERSIONS_FILE="${BITSTACK_ROOT}/.bitstack-versions"
+# Last-known onion hostname 'bitstack up'/'bitstack tor' queried from the
+# running tor service. Lets 'bitstack wallet' resolve an onion address on a
+# client host that does not run the stack itself (copy this file there).
+BITSTACK_ONION_FILE="${BITSTACK_ROOT}/.bitstack-onion"
 
 # fallbacks used if the GitHub API is unreachable
 BITSTACK_BITCOIN_FALLBACK="31.1"
 BITSTACK_ELECTRS_FALLBACK="v0.11.1"
 BITSTACK_SPARROW_FALLBACK="2.5.3"
 
-BITSTACK_SIBLINGS=(bitcoind.Dockerfile electrs.Dockerfile btc-stack.yml bitcoin.conf sparrow-config.json)
+BITSTACK_SIBLINGS=(bitcoind.Dockerfile electrs.Dockerfile tor.Dockerfile torrc btc-stack.yml bitcoin.conf sparrow-config.json)
 
 # Fail unless invoked as BITSTACK_NODE_USER (needs sudo for docker/apt, but must
 # not run as root itself -- matches the original deploy-bitcoin-node.sh guard).
@@ -94,6 +98,60 @@ bitstack_bitcoind_container() {
     --filter "label=com.docker.swarm.service.name=${BITSTACK_STACK_NAME}_bitcoind" \
     --filter "status=running" \
     --format '{{.ID}}' | head -n1
+}
+
+# Container ID of the running tor swarm task, or empty if none.
+bitstack_onion_container() {
+  sudo docker ps \
+    --filter "label=com.docker.swarm.service.name=${BITSTACK_STACK_NAME}_tor" \
+    --filter "status=running" \
+    --format '{{.ID}}' | head -n1
+}
+
+# Onion hostname the tor service is currently publishing, or a nonzero return
+# if the service isn't running or hasn't published a hidden service yet.
+bitstack_onion_hostname() {
+  local container
+  container="$(bitstack_onion_container)"
+  [[ -n "$container" ]] || return 1
+  sudo docker exec "$container" cat /var/lib/tor/hidden_service/hostname 2>/dev/null | tr -d '[:space:]'
+}
+
+# Poll for the onion hostname to appear -- first run generates a fresh
+# hidden-service keypair and publishing the descriptor can take a while.
+bitstack_wait_onion_hostname() {
+  local timeout="${1:-30}" waited=0 host
+  while true; do
+    host="$(bitstack_onion_hostname 2>/dev/null || true)"
+    if [[ -n "$host" ]]; then
+      printf '%s' "$host"
+      return 0
+    fi
+    ((waited >= timeout)) && return 1
+    sleep 2
+    ((waited += 2))
+  done
+}
+
+# Resolve the onion hostname for a remote Sparrow connection: prefer a live
+# query against a running tor service, falling back to the address
+# 'bitstack up'/'bitstack tor' last cached to BITSTACK_ONION_FILE (e.g. on a
+# client host that does not run the stack itself). Nonzero return if neither
+# is available.
+bitstack_resolve_onion_host() {
+  local host
+  host="$(bitstack_onion_hostname 2>/dev/null || true)"
+  if [[ -z "$host" && -f "${BITSTACK_ONION_FILE}" ]]; then
+    host="$(<"${BITSTACK_ONION_FILE}")"
+  fi
+  [[ -n "$host" ]] || return 1
+  printf '%s' "$host"
+}
+
+# True if something is listening on the local electrs Electrum RPC port --
+# i.e. electrs is co-resident with the caller, not just reachable remotely.
+bitstack_electrs_local_reachable() {
+  timeout 2 bash -c 'exec 3<>/dev/tcp/127.0.0.1/50001' 2>/dev/null
 }
 
 # Wait (best-effort) for every service in the stack's namespace to disappear

@@ -52,7 +52,7 @@ main() {
   # ---------------------------------------------------------------- prereqs
   info "Installing prerequisites"
   sudo apt-get update -y
-  sudo apt-get install -y ca-certificates curl gnupg wget tar coreutils
+  sudo apt-get install -y ca-certificates curl gnupg wget tar coreutils jq
 
   # ---------------------------------------------------------------- docker-ce
   if ! command -v docker >/dev/null 2>&1; then
@@ -99,6 +99,11 @@ https://download.docker.com/linux/ubuntu $(. /etc/os-release && echo "${UBUNTU_C
     --build-arg UID="${node_uid}" --build-arg GID="${node_gid}" \
     -t "local/electrs:${electrs_version}" \
     -f "${SCRIPT_DIR}/electrs.Dockerfile" "${SCRIPT_DIR}"
+
+  info "Building tor image (publishes electrs' Electrum RPC as a hidden service)"
+  sudo docker build \
+    -t "local/tor:latest" \
+    -f "${SCRIPT_DIR}/tor.Dockerfile" "${SCRIPT_DIR}"
 
   bitstack_write_versions "${bitcoin_version}" "${electrs_version}"
   ok "Images built; versions recorded in ${BITSTACK_VERSIONS_FILE}"
@@ -156,7 +161,7 @@ DESKTOP
   cat <<INFO
 
 Next:  ./bitstack.sh up       deploy the bitcoind + electrs stack
-Sparrow: ${BITSTACK_SPARROW_DIR}/bin/Sparrow   (or the app menu)
+Sparrow: ${BITSTACK_SPARROW_DIR}/bin/Sparrow   (or 'bitstack wallet')
 
 INFO
 }

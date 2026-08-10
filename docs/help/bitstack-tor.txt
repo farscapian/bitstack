@@ -1,0 +1,27 @@
+bitstack tor -- show the Tor onion address for electrs' Electrum RPC
+
+Usage:
+  bitstack tor
+
+What it does:
+  electrs' Electrum RPC port (50001) is published as a Tor hidden service by
+  the stack's 'tor' service, so a remote Sparrow can reach it without any
+  firewall port-forwarding. This command queries the running tor service for
+  its current onion hostname and prints it, caching the result to
+  .bitstack-onion (machine-local, gitignored) for 'bitstack wallet' to use
+  later -- including from a host that does not run the stack itself (copy
+  that file there, or paste the address it prints).
+
+  If the tor service is not reachable right now, falls back to the
+  last-known address (with a warning) instead of failing outright.
+
+Requires the stack to have been deployed at least once ('bitstack up') so a
+hidden-service key exists. The address is stable across restarts and
+redeploys (the key lives in a docker volume); it only changes if that volume
+is removed.
+
+Help:
+  bitstack tor help
+  bitstack help tor
+
+See also: docs/help/bitstack-wallet.txt, docs/help/bitstack-up.txt

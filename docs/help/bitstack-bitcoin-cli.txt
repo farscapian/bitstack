@@ -23,4 +23,4 @@ Requires the stack to be running ('bitstack up' first).
 Help (for this wrapper itself, not bitcoin-cli):
   bitstack help bitcoin-cli
 
-See also: docs/help/bitstack-up.txt
+See also: docs/help/bitstack-up.txt, docs/help/bitstack-wallet.txt

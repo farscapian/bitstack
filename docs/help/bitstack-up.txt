@@ -9,15 +9,21 @@ Usage:
 What it does:
   1. Prepares ~/.bitcoin (creates the directory, installs the default
      bitcoin.conf if one is not already there)
-  2. Deploys the 'btc' docker stack (bitcoind + electrs services) using the
-     images built by ./setup.sh
+  2. Deploys the 'btc' docker stack (bitcoind + electrs + tor services) using
+     the images built by ./setup.sh
+  3. Waits (up to a minute) for the tor service to publish its hidden
+     service and prints the resulting onion address -- electrs' Electrum
+     RPC port (50001), reachable over Tor without opening any firewall
+     ports. See: docs/help/bitstack-tor.txt
 
 Safe to re-run: 'docker stack deploy' converges the stack to match
-btc-stack.yml without discarding existing data.
+btc-stack.yml without discarding existing data (including the onion
+address, which is stable across redeploys).
 
 Help:
   bitstack up help
   bitstack help up
 
 See also: docs/help/bitstack-down.txt, docs/help/bitstack-reset.txt,
-docs/help/bitstack-bitcoin-cli.txt
+docs/help/bitstack-bitcoin-cli.txt, docs/help/bitstack-tor.txt,
+docs/help/bitstack-wallet.txt

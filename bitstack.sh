@@ -40,6 +40,8 @@ help_up()     { cat_help bitstack-up.txt; }
 help_down()   { cat_help bitstack-down.txt; }
 help_reset()  { cat_help bitstack-reset.txt; }
 help_bitcoin_cli() { cat_help bitstack-bitcoin-cli.txt; }
+help_tor()    { cat_help bitstack-tor.txt; }
+help_wallet() { cat_help bitstack-wallet.txt; }
 
 bitstack_help_topic() {
   case "${1:-}" in
@@ -48,6 +50,8 @@ bitstack_help_topic() {
     down)  help_down ;;
     reset) help_reset ;;
     bitcoin-cli) help_bitcoin_cli ;;
+    tor)    help_tor ;;
+    wallet) help_wallet ;;
     *) err "bitstack: unknown help topic: ${1} (try: bitstack help)" ;;
   esac
 }
@@ -67,6 +71,8 @@ cmd_up() {
     || err "Missing image local/bitcoind:${BITCOIN_VERSION} -- run ./setup.sh first."
   bitstack_image_present "local/electrs:${ELECTRS_VERSION}" \
     || err "Missing image local/electrs:${ELECTRS_VERSION} -- run ./setup.sh first."
+  bitstack_image_present "local/tor:latest" \
+    || err "Missing image local/tor:latest -- run ./setup.sh first."
 
   local node_uid node_gid
   node_uid="$(id -u "${BITSTACK_NODE_USER}")"
@@ -89,13 +95,26 @@ cmd_up() {
     -c "${SCRIPT_DIR}/btc-stack.yml" "${BITSTACK_STACK_NAME}"
 
   ok "Stack '${BITSTACK_STACK_NAME}' deployed."
+
+  info "Waiting for the Tor hidden service to publish (first run generates a key; can take up to a minute)"
+  local onion_host="" onion_line
+  if onion_host="$(bitstack_wait_onion_hostname 60)"; then
+    printf '%s\n' "${onion_host}" > "${BITSTACK_ONION_FILE}"
+    onion_line="tcp://${onion_host}:50001"
+  else
+    warn "Tor hidden service not ready yet -- check: sudo docker service logs -f ${BITSTACK_STACK_NAME}_tor"
+    onion_line="pending -- run 'bitstack tor' once the tor service is up"
+  fi
+
   cat <<INFO
 
 Stack:    sudo docker stack services ${BITSTACK_STACK_NAME}
 Logs:     sudo docker service logs -f ${BITSTACK_STACK_NAME}_bitcoind
           sudo docker service logs -f ${BITSTACK_STACK_NAME}_electrs
-Sparrow:  ${BITSTACK_SPARROW_DIR}/bin/Sparrow   (or the app menu)
+          sudo docker service logs -f ${BITSTACK_STACK_NAME}_tor
 Electrum: tcp://127.0.0.1:50001  (Private Electrum, SSL off)
+Onion:    ${onion_line}
+Wallet:   bitstack wallet   (auto: local when co-resident with electrs, else onion)
 
 INFO
 }
@@ -203,6 +222,88 @@ cmd_bitcoin_cli() {
   sudo docker exec "${tty_flags[@]}" "$container" bitcoin-cli -datadir="${BITSTACK_BITCOIN_DIR}" "$@"
 }
 
+# Shows the Tor onion address publishing electrs' Electrum RPC port,
+# querying the running tor service and caching the result to
+# BITSTACK_ONION_FILE for 'bitstack wallet' to use later (including from a
+# host that does not run the stack itself -- copy that file there).
+cmd_tor() {
+  help_requested "${1:-}" && { help_tor; return 0; }
+  (( $# == 0 )) || err "bitstack tor: unexpected argument: $1 (see: bitstack tor help)"
+
+  bitstack_require_node_user
+
+  local host
+  if host="$(bitstack_wait_onion_hostname 5)"; then
+    printf '%s\n' "${host}" > "${BITSTACK_ONION_FILE}"
+  elif [[ -f "${BITSTACK_ONION_FILE}" ]]; then
+    host="$(<"${BITSTACK_ONION_FILE}")"
+    warn "Tor hidden service not reachable right now; showing the last-known address."
+  else
+    err "No onion endpoint known -- run 'bitstack up' first."
+  fi
+
+  ok "Onion endpoint: tcp://${host}:50001"
+}
+
+# Idempotently patches ~/.sparrow/config so Sparrow points at the given
+# Electrum server on next launch, preserving every other Sparrow preference
+# (wallet list, theme, etc.) already in that file.
+bitstack_write_sparrow_server() {
+  local url="$1" cfg tmp
+  cfg="${BITSTACK_NODE_HOME}/.sparrow/config"
+  mkdir -p "$(dirname "${cfg}")"
+  tmp="$(mktemp)"
+  if [[ -f "${cfg}" ]]; then
+    jq --arg url "${url}" \
+      '.mode="ONLINE" | .serverType="ELECTRUM_SERVER" | .electrumServer=$url | .useProxy=false' \
+      "${cfg}" > "${tmp}"
+  else
+    jq -n --arg url "${url}" \
+      '{mode:"ONLINE", serverType:"ELECTRUM_SERVER", electrumServer:$url, useProxy:false}' \
+      > "${tmp}"
+  fi
+  mv "${tmp}" "${cfg}"
+}
+
+# Picks the Electrum server for Sparrow and launches it. With no argument,
+# defaults to 'local' when electrs is reachable on 127.0.0.1:50001
+# (co-resident with this host) and falls back to the Tor onion endpoint
+# otherwise -- e.g. running this on a separate client machine.
+cmd_wallet() {
+  local target=""
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      help|-h|--help) help_wallet; return 0 ;;
+      local|onion)
+        [[ -z "$target" ]] || err "bitstack wallet: unexpected argument: $1 (see: bitstack wallet help)"
+        target="$1"; shift ;;
+      *) err "bitstack wallet: unexpected argument: $1 (see: bitstack wallet help)" ;;
+    esac
+  done
+
+  bitstack_require_node_user
+  [[ -x "${BITSTACK_SPARROW_DIR}/bin/Sparrow" ]] || err "Sparrow is not installed -- run ./setup.sh first."
+  command -v jq >/dev/null 2>&1 || err "jq is required to configure Sparrow -- run ./setup.sh first."
+
+  if [[ -z "$target" ]]; then
+    if bitstack_electrs_local_reachable; then target="local"; else target="onion"; fi
+  fi
+
+  local electrum_url
+  if [[ "$target" == "local" ]]; then
+    electrum_url="tcp://127.0.0.1:50001"
+  else
+    local onion_host
+    onion_host="$(bitstack_resolve_onion_host)" \
+      || err "No onion endpoint known -- run 'bitstack up' or 'bitstack tor' on the electrs host, or copy its ${BITSTACK_ONION_FILE} here."
+    electrum_url="tcp://${onion_host}:50001"
+  fi
+
+  bitstack_write_sparrow_server "${electrum_url}"
+  info "Launching Sparrow (${target}: ${electrum_url})"
+  exec "${BITSTACK_SPARROW_DIR}/bin/Sparrow"
+}
+
 main() {
   local argv=()
   _as_cli_parse_global_flags argv "$@"
@@ -220,6 +321,8 @@ main() {
     down)  shift; cmd_down "$@" ;;
     reset) shift; cmd_reset "$@" ;;
     bitcoin-cli) shift; cmd_bitcoin_cli "$@" ;;
+    tor)    shift; cmd_tor "$@" ;;
+    wallet) shift; cmd_wallet "$@" ;;
     *) err "Unknown command: ${cmd}. Try 'bitstack help'" ;;
   esac
 }
