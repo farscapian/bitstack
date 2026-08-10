@@ -107,7 +107,10 @@ https://download.docker.com/linux/ubuntu $(. /etc/os-release && echo "${UBUNTU_C
   info "Installing Sparrow ${sparrow_version}"
   local tmp
   tmp="$(mktemp -d)"
-  trap 'rm -rf "${tmp}"' EXIT
+  # expand tmp now: it's local, and set -e exiting mid-function drops
+  # locals before a deferred (single-quoted) EXIT trap would see them
+  # shellcheck disable=SC2064
+  trap "rm -rf '${tmp}'" EXIT
   cd "${tmp}"
 
   local tarball="sparrowwallet-${sparrow_version}-x86_64.tar.gz"
@@ -120,7 +123,7 @@ https://download.docker.com/linux/ubuntu $(. /etc/os-release && echo "${UBUNTU_C
   # verify craig raw's signature over the manifest, then the tarball hash
   curl -fsSL https://keybase.io/craigraw/pgp_keys.asc | gpg --import
   gpg --verify "${manifest}.asc" "${manifest}"
-  grep " ${tarball}\$" "${manifest}" | sha256sum -c -
+  sha256sum --ignore-missing -c "${manifest}"
 
   tar -xzf "${tarball}"        # extracts a capitalized 'Sparrow' dir
   sudo rm -rf "${BITSTACK_SPARROW_DIR}"
