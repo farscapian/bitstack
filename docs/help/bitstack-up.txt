@@ -1,0 +1,22 @@
+bitstack up -- deploy the bitcoind + electrs stack
+
+Requires ./setup.sh to have run at least once (docker installed, swarm
+active, local/bitcoind and local/electrs images built).
+
+Usage:
+  bitstack up
+
+What it does:
+  1. Prepares ~/.bitcoin (creates the directory, installs the default
+     bitcoin.conf if one is not already there)
+  2. Deploys the 'btc' docker stack (bitcoind + electrs services) using the
+     images built by ./setup.sh
+
+Safe to re-run: 'docker stack deploy' converges the stack to match
+btc-stack.yml without discarding existing data.
+
+Help:
+  bitstack up help
+  bitstack help up
+
+See also: docs/help/bitstack-down.txt, docs/help/bitstack-reset.txt

@@ -1,0 +1,2 @@
+# Machine-local state written by setup.sh, consumed by bitstack.sh up.
+/.bitstack-versions

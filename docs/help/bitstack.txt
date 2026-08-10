@@ -1,0 +1,24 @@
+bitstack -- control the bitcoind + electrs docker-swarm stack
+
+Run from the bitstack repo root, as user 'derek'. Requires ./setup.sh to have
+installed docker and built the local/bitcoind and local/electrs images first.
+
+Commands:
+
+  up                  deploy the bitcoind + electrs stack
+  down                stop the stack; node data is left in place
+  reset               stop the stack and DELETE all node data (~/.bitcoin/*)
+
+Use 'bitstack <command> help' for detailed help on any command.
+Use 'bitstack help <command>' as an equivalent form.
+
+Global Options (valid anywhere on the command line):
+  -v, --verbose       Show diagnostics (--verbose is a full alias for -v)
+  -q, --quiet         Suppress status messages (errors still shown)
+  --timestamp         Prefix each line with ISO datetime
+  --log-id=ID         Mirror output to ~/.agentstack/logs/bitstack-<ID>.log
+
+First-time setup (dependencies, images, Sparrow wallet): ./setup.sh
+
+See also: docs/help/bitstack-up.txt, docs/help/bitstack-down.txt,
+docs/help/bitstack-reset.txt

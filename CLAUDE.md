@@ -23,12 +23,15 @@
 | [.agentstack/docs/code-quality.md](.agentstack/docs/code-quality.md) | shellcheck, git hooks |
 | [.agentstack/docs/implementation.md](.agentstack/docs/implementation.md) | Common shell patterns |
 | [.agentstack/docs/testing.md](.agentstack/docs/testing.md) | Generic pre-handoff checks |
+| [.agentstack/docs/cli-conventions.md](.agentstack/docs/cli-conventions.md) | Extending `bitstack.sh` (CLI structure, flags, help) |
+| [.agentstack/docs/cli-preamble.md](.agentstack/docs/cli-preamble.md) | The `cli-preamble.sh` provenance hook in `bitstack.sh main()` |
 
 ## Project guidance
 
 | File | Load when |
 |------|-----------|
 | [docs/README.md](docs/README.md) | Project guidance index |
+| [docs/cli.md](docs/cli.md) | `setup.sh` / `bitstack.sh` (up/down/reset), CLI layout |
 
 Add project-specific topic files under `docs/` and extend this table.
 

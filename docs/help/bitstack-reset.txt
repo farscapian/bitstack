@@ -1,0 +1,29 @@
+bitstack reset -- stop the stack and DELETE all node data
+
+Usage:
+  bitstack reset
+  bitstack reset -f | --force
+
+What it does:
+  1. Stops the 'btc' stack if it is running (same as 'bitstack down')
+  2. Removes the electrs database docker volume
+  3. Deletes everything under ~/.bitcoin, INCLUDING blocks/, chainstate/,
+     and wallets/ if present
+
+This is destructive. For a fully-validating node it means a full re-sync
+(hours to days) after the next 'bitstack up'. If wallets/ holds an unbacked
+wallet, any funds in it become UNRECOVERABLE.
+
+Confirmation:
+  Interactive runs require TWO confirmations before step 3 deletes
+  blocks/chainstate/wallets: a yes/no prompt naming what will be lost, then
+  typing the literal word RESET.
+
+Options:
+  -f, --force         Skip both confirmations (scripted use). Use with care.
+
+Help:
+  bitstack reset help
+  bitstack help reset
+
+See also: docs/help/bitstack-up.txt, docs/help/bitstack-down.txt
