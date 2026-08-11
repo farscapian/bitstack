@@ -6,9 +6,13 @@ Two entry points at the repo root, replacing the old `deploy-bitcoin-node.sh`:
   (including `jq`, used to patch Sparrow's config), docker-ce, single-node
   swarm, installs Sparrow (host GUI wallet). Does NOT build any docker
   images -- that is `bitstack up`'s job. Not a subcommand CLI -- just run it
-  directly.
+  directly. Also symlinks `bitstack.sh` to `/usr/local/bin/bitstack`
+  (`sudo ln -sf`) so the bare `bitstack` command below works from anywhere;
+  idempotent, and always resolves to the sibling `bitstack.sh` next to
+  `setup.sh` (the canonical local repo, when the human runs it).
 
-- **`./bitstack.sh`** -- runtime control of the docker-swarm stack, built to
+- **`bitstack.sh`** (bare command: `bitstack`, wired up by `./setup.sh`) --
+  runtime control of the docker-swarm stack, built to
   [.agentstack/docs/cli-conventions.md](../.agentstack/docs/cli-conventions.md)
   (single entrypoint + subcommand dispatch, external help files, tagged
   output via `.agentstack/scripts/lib/cli-log.sh`, the shared `cli-preamble.sh`

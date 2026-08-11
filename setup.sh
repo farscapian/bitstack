@@ -5,8 +5,9 @@
 # electrs docker-swarm stack. Ubuntu 26.04 (resolute).
 #
 #   1) apt prerequisites
-#   2) docker-ce + single-node swarm (post-install step 'docker stack deploy' needs)
-#   3) install Sparrow (host GUI wallet), pointed at local electrs
+#   2) symlink bitstack.sh to /usr/local/bin/bitstack (bare 'bitstack' command)
+#   3) docker-ce + single-node swarm (post-install step 'docker stack deploy' needs)
+#   4) install Sparrow (host GUI wallet), pointed at local electrs
 #
 # Building the local/bitcoind, local/electrs, and local/tor images
 # (GPG+SHA256 verified Bitcoin Core source) is 'bitstack up's job, not this
@@ -53,6 +54,10 @@ main() {
   info "Installing prerequisites"
   sudo apt-get update -y
   sudo apt-get install -y ca-certificates curl gnupg wget tar coreutils jq
+
+  # ------------------------------------------------------------- bitstack command
+  info "Wiring up 'bitstack' command"
+  sudo ln -sf "${SCRIPT_DIR}/bitstack.sh" /usr/local/bin/bitstack
 
   # ---------------------------------------------------------------- docker-ce
   if ! command -v docker >/dev/null 2>&1; then
@@ -131,7 +136,7 @@ DESKTOP
   ok "Setup complete."
   cat <<INFO
 
-Next:  ./bitstack.sh up       deploy the bitcoind + electrs stack
+Next:  bitstack up       deploy the bitcoind + electrs stack
 Sparrow: ${BITSTACK_SPARROW_DIR}/bin/Sparrow   (or 'bitstack wallet')
 
 INFO
