@@ -4,7 +4,7 @@ Usage:
   bitstack bitcoin-cli [bitcoin-cli args...]
 
 What it does:
-  Finds the running bitcoind container for the 'btc' stack and runs
+  Finds the running bitcoind container for the 'bitstack' stack and runs
   bitcoin-cli inside it (docker exec), using the same datadir the node
   was started with, so cookie auth just works.
 

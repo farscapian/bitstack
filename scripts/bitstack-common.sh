@@ -12,7 +12,7 @@
 BITSTACK_NODE_USER="${BITSTACK_NODE_USER:-$(id -un)}"
 BITSTACK_NODE_HOME="/home/${BITSTACK_NODE_USER}"
 BITSTACK_BITCOIN_DIR="${BITSTACK_NODE_HOME}/.bitcoin"      # bind-mounted into containers
-BITSTACK_STACK_NAME="btc"
+BITSTACK_STACK_NAME="bitstack"
 BITSTACK_SPARROW_DIR="/opt/sparrow"
 # Last-known onion hostname 'bitstack up'/'bitstack tor' queried from the
 # running tor service. Lets 'bitstack wallet' resolve an onion address on a

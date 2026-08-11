@@ -12,7 +12,7 @@ What it does:
      is already present locally, so re-running is fast
   2. Prepares ~/.bitcoin (creates the directory, installs the default
      bitcoin.conf if one is not already there)
-  3. Deploys the 'btc' docker stack (bitcoind + electrs + tor services)
+  3. Deploys the 'bitstack' docker stack (bitcoind + electrs + tor services)
   4. Waits (up to a minute) for the tor service to publish its hidden
      service and prints the resulting onion address -- electrs' Electrum
      RPC port (50001), reachable over Tor without opening any firewall

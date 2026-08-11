@@ -4,7 +4,7 @@ Usage:
   bitstack down
 
 What it does:
-  Removes the 'btc' docker stack (docker stack rm) and waits for its
+  Removes the 'bitstack' docker stack (docker stack rm) and waits for its
   services to fully terminate.
 
 Node data under ~/.bitcoin and the electrs database volume are left in

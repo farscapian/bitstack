@@ -5,7 +5,7 @@ Usage:
   bitstack reset -f | --force
 
 What it does:
-  1. Stops the 'btc' stack if it is running (same as 'bitstack down')
+  1. Stops the 'bitstack' stack if it is running (same as 'bitstack down')
   2. Removes the electrs database docker volume
   3. Deletes everything under ~/.bitcoin, INCLUDING blocks/, chainstate/,
      and wallets/ if present
