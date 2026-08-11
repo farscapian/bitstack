@@ -1,5 +1,5 @@
 # Interpolated at deploy time from the environment:
-#   BITCOIN_VERSION  ELECTRS_VERSION  BITCOIN_DIR
+#   BITCOIN_VERSION  ELECTRS_VERSION  TOR_VERSION  BITCOIN_DIR
 services:
   bitcoind:
     image: local/bitcoind:${BITCOIN_VERSION}
@@ -42,7 +42,7 @@ services:
         condition: any
 
   tor:
-    image: local/tor:latest
+    image: local/tor:${TOR_VERSION}
     # No published ports: this container only publishes the electrs Electrum
     # RPC port as a Tor hidden service (see torrc). Clients reach it with
     # their own Tor client -- see 'bitstack wallet' / 'bitstack tor'.

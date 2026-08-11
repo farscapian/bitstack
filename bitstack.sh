@@ -73,10 +73,11 @@ cmd_up() {
   node_uid="$(id -u "${BITSTACK_NODE_USER}")"
   node_gid="$(id -g "${BITSTACK_NODE_USER}")"
 
-  local bitcoin_tag bitcoin_version electrs_version
+  local bitcoin_tag bitcoin_version electrs_version tor_version
   bitcoin_tag="$(bitstack_latest_tag bitcoin/bitcoin "v${BITSTACK_BITCOIN_FALLBACK}")"
   bitcoin_version="${bitcoin_tag#v}"
   electrs_version="$(bitstack_latest_tag romanz/electrs "${BITSTACK_ELECTRS_FALLBACK}")"
+  tor_version="${BITSTACK_TOR_IMAGE_VERSION}"
 
   bitstack_ensure_image "local/bitcoind:${bitcoin_version}" \
     sudo docker build \
@@ -92,9 +93,9 @@ cmd_up() {
       -t "local/electrs:${electrs_version}" \
       -f "${SCRIPT_DIR}/electrs.Dockerfile" "${SCRIPT_DIR}"
 
-  bitstack_ensure_image "local/tor:latest" \
+  bitstack_ensure_image "local/tor:${tor_version}" \
     sudo docker build \
-      -t "local/tor:latest" \
+      -t "local/tor:${tor_version}" \
       -f "${SCRIPT_DIR}/tor.Dockerfile" "${SCRIPT_DIR}"
 
   info "Preparing ${BITSTACK_BITCOIN_DIR}"
@@ -109,6 +110,7 @@ cmd_up() {
   sudo env \
     BITCOIN_VERSION="${bitcoin_version}" \
     ELECTRS_VERSION="${electrs_version}" \
+    TOR_VERSION="${tor_version}" \
     BITCOIN_DIR="${BITSTACK_BITCOIN_DIR}" \
     docker stack deploy --resolve-image never \
     -c "${SCRIPT_DIR}/btc-stack.yml" "${BITSTACK_STACK_NAME}"
