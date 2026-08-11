@@ -3,7 +3,9 @@
 #
 # Commands: up / down / reset. See docs/help/bitstack.txt (or run 'bitstack'
 # with no arguments) for the command catalog. First-time dependency install
-# (docker, swarm, images, Sparrow) is ./setup.sh, not this script.
+# (docker, swarm, Sparrow) is ./setup.sh, not this script. 'bitstack up'
+# builds the local/bitcoind, local/electrs, and local/tor images itself,
+# tagged by version, and skips the build once a tag already exists.
 #
 # Run as your regular login user (needs sudo). Not root.
 
@@ -65,18 +67,35 @@ cmd_up() {
   bitstack_require_node_user
   bitstack_require_siblings "${SCRIPT_DIR}"
 
-  bitstack_load_versions || err "No images built yet -- run ./setup.sh first (see: bitstack up help)."
   bitstack_swarm_active || err "Docker swarm is not active -- run ./setup.sh first."
-  bitstack_image_present "local/bitcoind:${BITCOIN_VERSION}" \
-    || err "Missing image local/bitcoind:${BITCOIN_VERSION} -- run ./setup.sh first."
-  bitstack_image_present "local/electrs:${ELECTRS_VERSION}" \
-    || err "Missing image local/electrs:${ELECTRS_VERSION} -- run ./setup.sh first."
-  bitstack_image_present "local/tor:latest" \
-    || err "Missing image local/tor:latest -- run ./setup.sh first."
 
   local node_uid node_gid
   node_uid="$(id -u "${BITSTACK_NODE_USER}")"
   node_gid="$(id -g "${BITSTACK_NODE_USER}")"
+
+  local bitcoin_tag bitcoin_version electrs_version
+  bitcoin_tag="$(bitstack_latest_tag bitcoin/bitcoin "v${BITSTACK_BITCOIN_FALLBACK}")"
+  bitcoin_version="${bitcoin_tag#v}"
+  electrs_version="$(bitstack_latest_tag romanz/electrs "${BITSTACK_ELECTRS_FALLBACK}")"
+
+  bitstack_ensure_image "local/bitcoind:${bitcoin_version}" \
+    sudo docker build \
+      --build-arg BITCOIN_VERSION="${bitcoin_version}" \
+      --build-arg UID="${node_uid}" --build-arg GID="${node_gid}" \
+      -t "local/bitcoind:${bitcoin_version}" \
+      -f "${SCRIPT_DIR}/bitcoind.Dockerfile" "${SCRIPT_DIR}"
+
+  bitstack_ensure_image "local/electrs:${electrs_version}" \
+    sudo docker build \
+      --build-arg ELECTRS_VERSION="${electrs_version}" \
+      --build-arg UID="${node_uid}" --build-arg GID="${node_gid}" \
+      -t "local/electrs:${electrs_version}" \
+      -f "${SCRIPT_DIR}/electrs.Dockerfile" "${SCRIPT_DIR}"
+
+  bitstack_ensure_image "local/tor:latest" \
+    sudo docker build \
+      -t "local/tor:latest" \
+      -f "${SCRIPT_DIR}/tor.Dockerfile" "${SCRIPT_DIR}"
 
   info "Preparing ${BITSTACK_BITCOIN_DIR}"
   mkdir -p "${BITSTACK_BITCOIN_DIR}"
@@ -86,10 +105,10 @@ cmd_up() {
       "${SCRIPT_DIR}/bitcoin.conf" "${BITSTACK_BITCOIN_DIR}/bitcoin.conf"
   fi
 
-  info "Deploying stack '${BITSTACK_STACK_NAME}' (bitcoind ${BITCOIN_VERSION}, electrs ${ELECTRS_VERSION})"
+  info "Deploying stack '${BITSTACK_STACK_NAME}' (bitcoind ${bitcoin_version}, electrs ${electrs_version})"
   sudo env \
-    BITCOIN_VERSION="${BITCOIN_VERSION}" \
-    ELECTRS_VERSION="${ELECTRS_VERSION}" \
+    BITCOIN_VERSION="${bitcoin_version}" \
+    ELECTRS_VERSION="${electrs_version}" \
     BITCOIN_DIR="${BITSTACK_BITCOIN_DIR}" \
     docker stack deploy --resolve-image never \
     -c "${SCRIPT_DIR}/btc-stack.yml" "${BITSTACK_STACK_NAME}"

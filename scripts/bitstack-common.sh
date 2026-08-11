@@ -2,8 +2,8 @@
 # bitstack-common.sh -- shared config and helpers for setup.sh and bitstack.sh.
 #
 # Sourced by both entry points; not meant to be executed directly. Callers must
-# set BITSTACK_ROOT (the repo root, where the sibling Dockerfiles/yml/conf and
-# the .bitstack-versions state file live) before sourcing.
+# set BITSTACK_ROOT (the repo root, where the sibling Dockerfiles/yml/conf
+# live) before sourcing.
 #
 # shellcheck shell=bash
 
@@ -14,7 +14,6 @@ BITSTACK_NODE_HOME="/home/${BITSTACK_NODE_USER}"
 BITSTACK_BITCOIN_DIR="${BITSTACK_NODE_HOME}/.bitcoin"      # bind-mounted into containers
 BITSTACK_STACK_NAME="btc"
 BITSTACK_SPARROW_DIR="/opt/sparrow"
-BITSTACK_VERSIONS_FILE="${BITSTACK_ROOT}/.bitstack-versions"
 # Last-known onion hostname 'bitstack up'/'bitstack tor' queried from the
 # running tor service. Lets 'bitstack wallet' resolve an onion address on a
 # client host that does not run the stack itself (copy this file there).
@@ -59,33 +58,25 @@ bitstack_latest_tag() {
   printf '%s' "${tag:-$fallback}"
 }
 
-# Load BITCOIN_VERSION / ELECTRS_VERSION written by setup.sh. Returns 1 (no
-# error printed) when the state file is absent so callers can give an
-# actionable message pointing at ./setup.sh.
-bitstack_load_versions() {
-  [[ -f "${BITSTACK_VERSIONS_FILE}" ]] || return 1
-  # shellcheck source=/dev/null
-  source "${BITSTACK_VERSIONS_FILE}"
-  [[ -n "${BITCOIN_VERSION:-}" && -n "${ELECTRS_VERSION:-}" ]] || return 1
-}
-
-bitstack_write_versions() {
-  local bitcoin_version="$1" electrs_version="$2"
-  cat > "${BITSTACK_VERSIONS_FILE}" <<EOF
-# Written by setup.sh -- versions of the local/bitcoind and local/electrs
-# images currently built. Consumed by 'bitstack up'. Machine-local state,
-# not tracked in git.
-BITCOIN_VERSION=${bitcoin_version}
-ELECTRS_VERSION=${electrs_version}
-EOF
-}
-
 bitstack_swarm_active() {
   sudo docker info 2>/dev/null | grep -q 'Swarm: active'
 }
 
 bitstack_image_present() {
   sudo docker image inspect "$1" >/dev/null 2>&1
+}
+
+# Build docker image tagged $1 by running the remaining arguments as the
+# build command, unless that tag already exists locally -- 'bitstack up' is
+# safe to re-run without re-building images it already built.
+bitstack_ensure_image() {
+  local tag="$1"; shift
+  if bitstack_image_present "${tag}"; then
+    info "Image ${tag} already present, skipping build"
+    return 0
+  fi
+  info "Building image ${tag}"
+  "$@"
 }
 
 bitstack_stack_exists() {

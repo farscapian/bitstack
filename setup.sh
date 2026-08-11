@@ -6,17 +6,17 @@
 #
 #   1) apt prerequisites
 #   2) docker-ce + single-node swarm (post-install step 'docker stack deploy' needs)
-#   3) build the local/bitcoind and local/electrs images (GPG+SHA256 verified
-#      Bitcoin Core source)
-#   4) install Sparrow (host GUI wallet), pointed at local electrs
+#   3) install Sparrow (host GUI wallet), pointed at local electrs
 #
-# Resolved image versions are written to .bitstack-versions for 'bitstack up'
-# to consume. Reads these sibling files from its own directory:
-#   bitcoind.Dockerfile  electrs.Dockerfile  bitcoin.conf  sparrow-config.json
+# Building the local/bitcoind, local/electrs, and local/tor images
+# (GPG+SHA256 verified Bitcoin Core source) is 'bitstack up's job, not this
+# script's -- it builds each on first run and skips the build on later runs
+# once the tagged image already exists. Reads sparrow-config.json from its
+# own directory.
 #
 # Run as your regular login user (needs sudo). Not root. Deploying/stopping/resetting the
 # stack itself is bitstack.sh's job (bitstack up / down / reset) -- this script
-# only installs and builds.
+# only installs dependencies.
 
 set -euo pipefail
 
@@ -77,38 +77,9 @@ https://download.docker.com/linux/ubuntu $(. /etc/os-release && echo "${UBUNTU_C
     sudo docker swarm init >/dev/null 2>&1 || sudo docker swarm init --advertise-addr 127.0.0.1 >/dev/null
   fi
 
-  # ---------------------------------------------------------------- versions
-  local bitcoin_tag bitcoin_version electrs_version sparrow_version
-  bitcoin_tag="$(bitstack_latest_tag bitcoin/bitcoin "v${BITSTACK_BITCOIN_FALLBACK}")"
-  bitcoin_version="${bitcoin_tag#v}"
-  electrs_version="$(bitstack_latest_tag romanz/electrs "${BITSTACK_ELECTRS_FALLBACK}")"
-  sparrow_version="$(bitstack_latest_tag sparrowwallet/sparrow "${BITSTACK_SPARROW_FALLBACK}")"
-  info "bitcoind ${bitcoin_version} | electrs ${electrs_version} | sparrow ${sparrow_version}"
-
-  # ---------------------------------------------------------------- build images
-  info "Building bitcoind image"
-  sudo docker build \
-    --build-arg BITCOIN_VERSION="${bitcoin_version}" \
-    --build-arg UID="${node_uid}" --build-arg GID="${node_gid}" \
-    -t "local/bitcoind:${bitcoin_version}" \
-    -f "${SCRIPT_DIR}/bitcoind.Dockerfile" "${SCRIPT_DIR}"
-
-  info "Building electrs image (this compiles rocksdb; give it a few minutes)"
-  sudo docker build \
-    --build-arg ELECTRS_VERSION="${electrs_version}" \
-    --build-arg UID="${node_uid}" --build-arg GID="${node_gid}" \
-    -t "local/electrs:${electrs_version}" \
-    -f "${SCRIPT_DIR}/electrs.Dockerfile" "${SCRIPT_DIR}"
-
-  info "Building tor image (publishes electrs' Electrum RPC as a hidden service)"
-  sudo docker build \
-    -t "local/tor:latest" \
-    -f "${SCRIPT_DIR}/tor.Dockerfile" "${SCRIPT_DIR}"
-
-  bitstack_write_versions "${bitcoin_version}" "${electrs_version}"
-  ok "Images built; versions recorded in ${BITSTACK_VERSIONS_FILE}"
-
   # ---------------------------------------------------------------- Sparrow (host)
+  local sparrow_version
+  sparrow_version="$(bitstack_latest_tag sparrowwallet/sparrow "${BITSTACK_SPARROW_FALLBACK}")"
   info "Installing Sparrow ${sparrow_version}"
   local tmp
   tmp="$(mktemp -d)"

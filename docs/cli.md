@@ -4,20 +4,21 @@ Two entry points at the repo root, replacing the old `deploy-bitcoin-node.sh`:
 
 - **`./setup.sh`** -- one-time (re-runnable) dependency install: apt prereqs
   (including `jq`, used to patch Sparrow's config), docker-ce, single-node
-  swarm, builds the `local/bitcoind`, `local/electrs`, and `local/tor` images
-  (bitcoind/electrs GPG+SHA256 verified; tor is Debian's apt package),
-  installs Sparrow (host GUI wallet). Writes resolved image versions to
-  `.bitstack-versions` (gitignored, machine-local) for `bitstack.sh` to read.
-  Not a subcommand CLI -- just run it directly.
+  swarm, installs Sparrow (host GUI wallet). Does NOT build any docker
+  images -- that is `bitstack up`'s job. Not a subcommand CLI -- just run it
+  directly.
 
 - **`./bitstack.sh`** -- runtime control of the docker-swarm stack, built to
   [.agentstack/docs/cli-conventions.md](../.agentstack/docs/cli-conventions.md)
   (single entrypoint + subcommand dispatch, external help files, tagged
   output via `.agentstack/scripts/lib/cli-log.sh`, the shared `cli-preamble.sh`
   provenance hook). Commands:
-  - `bitstack up` -- prepare `~/.bitcoin` and deploy the stack (idempotent).
-    Also waits for the `tor` service to publish its hidden service and
-    prints the onion address.
+  - `bitstack up` -- builds the `local/bitcoind`, `local/electrs`, and
+    `local/tor` images (bitcoind/electrs GPG+SHA256 verified; tor is
+    Debian's apt package), tagged by resolved version, skipping the build
+    when a tag is already present locally. Then prepares `~/.bitcoin` and
+    deploys the stack (idempotent). Also waits for the `tor` service to
+    publish its hidden service and prints the onion address.
   - `bitstack down` -- stop the stack; node data is left in place
   - `bitstack reset` -- stop the stack, remove the electrs volume, and DELETE
     `~/.bitcoin/*`. Requires two interactive confirmations before deleting
