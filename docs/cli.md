@@ -10,7 +10,13 @@ Two entry points at the repo root, replacing the old `deploy-bitcoin-node.sh`:
   `bitstack.sh` to `/usr/local/bin/bitstack` (`sudo ln -sf`) so the bare
   `bitstack` command below works from anywhere; idempotent, and always
   resolves to the sibling `bitstack.sh` next to `setup.sh` (the canonical
-  local repo, when the human runs it).
+  local repo, when the human runs it). Adds the invoking user to the
+  `docker` group if not already a member (checked independently of
+  install, so a re-run still catches it); `bitstack.sh` itself always runs
+  `docker` via `sudo` so this isn't required for bitstack to work, but a
+  membership just added is stale in the current login session (the kernel
+  reads groups at login) -- setup.sh warns and tells the human to log out
+  and back in, or run `newgrp docker`, before using bare `docker` commands.
 
 - **`bitstack.sh`** (bare command: `bitstack`, wired up by `./setup.sh`) --
   runtime control of the docker-swarm stack, built to

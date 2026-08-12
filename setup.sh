@@ -70,9 +70,22 @@ https://download.docker.com/linux/ubuntu $(. /etc/os-release && echo "${UBUNTU_C
     sudo apt-get update -y
     sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
     sudo systemctl enable --now docker
-    sudo usermod -aG docker "${BITSTACK_NODE_USER}" || true
   else
     info "docker already present, skipping install"
+  fi
+
+  # Group membership is checked independently of install (docker may already
+  # be present -- e.g. a re-run, or installed by someone else -- while the
+  # invoking user still isn't in the group). bitstack.sh always runs docker
+  # via sudo itself, so this isn't required for bitstack to work, but a
+  # membership added just now is stale in THIS login session (the kernel
+  # only reads group membership at login), so tell the human explicitly
+  # rather than leaving a silent trap for their next bare 'docker' command.
+  local docker_group_added=0
+  if ! id -nG "${BITSTACK_NODE_USER}" | grep -qw docker; then
+    info "Adding ${BITSTACK_NODE_USER} to the docker group"
+    sudo usermod -aG docker "${BITSTACK_NODE_USER}"
+    docker_group_added=1
   fi
 
   # single-node swarm (required for 'docker stack deploy', used by 'bitstack up')
@@ -88,6 +101,11 @@ Next:    bitstack up        deploy the bitcoind + electrs stack
 Wallet:  bitstack sparrow   installs Sparrow on first run, then launches it
 
 INFO
+
+  if (( docker_group_added )); then
+    warn "Added ${BITSTACK_NODE_USER} to the docker group -- this login session doesn't see it yet."
+    warn "Log out and log back in, or run 'newgrp docker', before using bare 'docker' commands."
+  fi
 }
 
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then main "$@"; fi
