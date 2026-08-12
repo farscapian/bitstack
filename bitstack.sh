@@ -12,7 +12,10 @@
 
 set -euo pipefail
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# readlink -f resolves the /usr/local/bin/bitstack symlink (see setup.sh) to
+# this file's real location -- BASH_SOURCE alone would leave SCRIPT_DIR
+# pointing at /usr/local/bin when invoked as the bare 'bitstack' command.
+SCRIPT_DIR="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")" && pwd)"
 BITSTACK_ROOT="${SCRIPT_DIR}"
 
 # shellcheck source=.agentstack/scripts/lib/cli-log.sh

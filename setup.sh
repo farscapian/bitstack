@@ -21,7 +21,10 @@
 
 set -euo pipefail
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# readlink -f matches bitstack.sh's SCRIPT_DIR resolution (needed there to
+# see through the /usr/local/bin/bitstack symlink this script creates); kept
+# the same here so both entry points resolve identically if ever symlinked.
+SCRIPT_DIR="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")" && pwd)"
 BITSTACK_ROOT="${SCRIPT_DIR}"
 
 # shellcheck source=.agentstack/scripts/lib/cli-log.sh
