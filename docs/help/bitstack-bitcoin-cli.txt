@@ -18,7 +18,16 @@ What it does:
     bitstack bitcoin-cli getblockchaininfo
     bitstack bitcoin-cli -rpcwallet=mywallet getbalance
 
-Requires the stack to be running ('bitstack up' first).
+  Output is checked for valid JSON and reformatted with 'jq .' when it is
+  (e.g. 'getblockchaininfo'). Not every bitcoin-cli output is JSON --
+  'help' is plain text, and scalar string results like a block hash print
+  unquoted, so they aren't valid JSON on their own -- anything that isn't
+  valid JSON is printed exactly as bitcoin-cli produced it. Only stdout is
+  checked; RPC errors and connection failures (stderr) are never touched.
+  bitcoin-cli's own exit code is preserved either way.
+
+Requires the stack to be running ('bitstack up' first) and jq (installed
+by ./setup.sh).
 
 Help (for this wrapper itself, not bitcoin-cli):
   bitstack help bitcoin-cli

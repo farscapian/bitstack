@@ -251,19 +251,40 @@ cmd_reset() {
 # bitcoin-cli has its own 'help' RPC (lists/describes RPC commands) -- 'bitstack
 # bitcoin-cli help getblockchaininfo' must reach bitcoin-cli unchanged. Use
 # 'bitstack help bitcoin-cli' for this wrapper's own help instead.
+#
+# stdout is captured (not streamed) so it can be checked for valid JSON and
+# reformatted with 'jq .' when it is -- not every bitcoin-cli output is JSON
+# (e.g. 'help' is plain text, and scalar string results like a block hash
+# print unquoted, so they aren't valid JSON on their own), so anything that
+# fails 'jq empty' is printed exactly as bitcoin-cli produced it. Only stdout
+# goes through this check; stderr (RPC errors, connection failures) streams
+# straight through untouched. No -t/tty flag: with stdout captured for the
+# jq check, docker exec is never attached to a real terminal to allocate one
+# for, only -i for stdin passthrough (e.g. 'bitcoin-cli -stdin').
 cmd_bitcoin_cli() {
   bitstack_require_node_user
   bitstack_stack_exists || err "Stack '${BITSTACK_STACK_NAME}' is not running -- run 'bitstack up' first."
+  command -v jq >/dev/null 2>&1 || err "jq is required to format bitcoin-cli's JSON output -- run ./setup.sh first."
 
   local container
   container="$(bitstack_bitcoind_container)"
   [[ -n "$container" ]] \
     || err "bitcoind container not found (stack up but service not ready?) -- check: sudo docker service ps ${BITSTACK_STACK_NAME}_bitcoind"
 
-  local -a tty_flags=(-i)
-  [[ -t 0 && -t 1 ]] && tty_flags=(-it)
+  local out status
+  if out="$(sudo docker exec -i "$container" bitcoin-cli -datadir="${BITSTACK_BITCOIN_DIR}" "$@")"; then
+    status=0
+  else
+    status=$?
+  fi
 
-  sudo docker exec "${tty_flags[@]}" "$container" bitcoin-cli -datadir="${BITSTACK_BITCOIN_DIR}" "$@"
+  if [[ -n "$out" ]] && jq empty <<<"${out}" >/dev/null 2>&1; then
+    jq . <<<"${out}"
+  else
+    printf '%s\n' "${out}"
+  fi
+
+  return "${status}"
 }
 
 # Shows the Tor onion address publishing electrs' Electrum RPC port,

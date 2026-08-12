@@ -42,7 +42,13 @@ Two entry points at the repo root, replacing the old `deploy-bitcoin-node.sh`:
     auth just works). All arguments are forwarded verbatim to `bitcoin-cli`;
     unlike the other subcommands this one does NOT intercept a bare `help`
     argument, since `bitcoin-cli help` is itself a real RPC command. Use
-    `bitstack help bitcoin-cli` for this wrapper's own help.
+    `bitstack help bitcoin-cli` for this wrapper's own help. stdout is
+    captured and checked with `jq empty`; when it's valid JSON it's
+    reformatted with `jq .`, otherwise it's printed exactly as bitcoin-cli
+    produced it (plain-text `help`, unquoted scalar strings like a block
+    hash, etc. all aren't valid JSON on their own). stderr (RPC errors,
+    connection failures) is never touched, and bitcoin-cli's own exit code
+    is preserved.
   - `bitstack tor` -- print the onion address publishing electrs' Electrum
     RPC port (50001), querying the running `tor` service and caching it to
     `.bitstack-onion` (gitignored, machine-local) for `bitstack sparrow` to
