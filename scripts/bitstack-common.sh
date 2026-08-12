@@ -15,7 +15,7 @@ BITSTACK_BITCOIN_DIR="${BITSTACK_NODE_HOME}/.bitcoin"      # bind-mounted into c
 BITSTACK_STACK_NAME="bitstack"
 BITSTACK_SPARROW_DIR="/opt/sparrow"
 # Last-known onion hostname 'bitstack up'/'bitstack tor' queried from the
-# running tor service. Lets 'bitstack wallet' resolve an onion address on a
+# running tor service. Lets 'bitstack sparrow' resolve an onion address on a
 # client host that does not run the stack itself (copy this file there).
 BITSTACK_ONION_FILE="${BITSTACK_ROOT}/.bitstack-onion"
 

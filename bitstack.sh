@@ -3,9 +3,10 @@
 #
 # Commands: up / down / reset. See docs/help/bitstack.txt (or run 'bitstack'
 # with no arguments) for the command catalog. First-time dependency install
-# (docker, swarm, Sparrow) is ./setup.sh, not this script. 'bitstack up'
-# builds the local/bitcoind, local/electrs, and local/tor images itself,
-# tagged by version, and skips the build once a tag already exists.
+# (docker, swarm) is ./setup.sh, not this script. 'bitstack up' builds the
+# local/bitcoind, local/electrs, and local/tor images itself, tagged by
+# version, and skips the build once a tag already exists. 'bitstack sparrow'
+# installs Sparrow (host GUI wallet) itself, on first run.
 #
 # Run as your regular login user (needs sudo). Not root.
 
@@ -43,7 +44,7 @@ help_down()   { cat_help bitstack-down.txt; }
 help_reset()  { cat_help bitstack-reset.txt; }
 help_bitcoin_cli() { cat_help bitstack-bitcoin-cli.txt; }
 help_tor()    { cat_help bitstack-tor.txt; }
-help_wallet() { cat_help bitstack-wallet.txt; }
+help_sparrow() { cat_help bitstack-sparrow.txt; }
 
 bitstack_help_topic() {
   case "${1:-}" in
@@ -53,7 +54,7 @@ bitstack_help_topic() {
     reset) help_reset ;;
     bitcoin-cli) help_bitcoin_cli ;;
     tor)    help_tor ;;
-    wallet) help_wallet ;;
+    sparrow) help_sparrow ;;
     *) err "bitstack: unknown help topic: ${1} (try: bitstack help)" ;;
   esac
 }
@@ -135,7 +136,7 @@ Logs:     sudo docker service logs -f ${BITSTACK_STACK_NAME}_bitcoind
           sudo docker service logs -f ${BITSTACK_STACK_NAME}_tor
 Electrum: tcp://127.0.0.1:50001  (Private Electrum, SSL off)
 Onion:    ${onion_line}
-Wallet:   bitstack wallet   (auto: local when co-resident with electrs, else onion)
+Wallet:   bitstack sparrow   (installs Sparrow on first run; auto: local when co-resident with electrs, else onion)
 
 INFO
 }
@@ -245,7 +246,7 @@ cmd_bitcoin_cli() {
 
 # Shows the Tor onion address publishing electrs' Electrum RPC port,
 # querying the running tor service and caching the result to
-# BITSTACK_ONION_FILE for 'bitstack wallet' to use later (including from a
+# BITSTACK_ONION_FILE for 'bitstack sparrow' to use later (including from a
 # host that does not run the stack itself -- copy that file there).
 cmd_tor() {
   help_requested "${1:-}" && { help_tor; return 0; }
@@ -286,25 +287,94 @@ bitstack_write_sparrow_server() {
   mv "${tmp}" "${cfg}"
 }
 
-# Picks the Electrum server for Sparrow and launches it. With no argument,
-# defaults to 'local' when electrs is reachable on 127.0.0.1:50001
-# (co-resident with this host) and falls back to the Tor onion endpoint
-# otherwise -- e.g. running this on a separate client machine.
-cmd_wallet() {
+# Installs Sparrow (host GUI wallet) into BITSTACK_SPARROW_DIR, verifying the
+# release tarball via craigraw's GPG signature over the release manifest and
+# the manifest's SHA256 hash, then wires up a desktop launcher and a
+# ~/.sparrow/config (won't overwrite one that already exists). Idempotent:
+# skips entirely once .../bin/Sparrow is already present.
+bitstack_ensure_sparrow_installed() {
+  [[ -x "${BITSTACK_SPARROW_DIR}/bin/Sparrow" ]] && return 0
+
+  bitstack_require_siblings "${SCRIPT_DIR}"
+  command -v jq >/dev/null 2>&1 || err "jq is required to configure Sparrow -- run ./setup.sh first."
+
+  local node_uid node_gid
+  node_uid="$(id -u "${BITSTACK_NODE_USER}")"
+  node_gid="$(id -g "${BITSTACK_NODE_USER}")"
+
+  local sparrow_version
+  sparrow_version="$(bitstack_latest_tag sparrowwallet/sparrow "${BITSTACK_SPARROW_FALLBACK}")"
+  info "Installing Sparrow ${sparrow_version}"
+
+  local tmp
+  tmp="$(mktemp -d)"
+  # expand tmp now: it's local, and set -e exiting mid-function drops
+  # locals before a deferred (single-quoted) RETURN trap would see them
+  # shellcheck disable=SC2064
+  trap "rm -rf '${tmp}'" RETURN
+  cd "${tmp}"
+
+  local tarball="sparrowwallet-${sparrow_version}-x86_64.tar.gz"
+  local manifest="sparrow-${sparrow_version}-manifest.txt"
+  local base="https://github.com/sparrowwallet/sparrow/releases/download/${sparrow_version}"
+  curl -fsSLO "${base}/${tarball}"
+  curl -fsSLO "${base}/${manifest}"
+  curl -fsSLO "${base}/${manifest}.asc"
+
+  # verify craig raw's signature over the manifest, then the tarball hash
+  curl -fsSL https://keybase.io/craigraw/pgp_keys.asc | gpg --import
+  gpg --verify "${manifest}.asc" "${manifest}"
+  sha256sum --ignore-missing -c "${manifest}"
+
+  tar -xzf "${tarball}"        # extracts a capitalized 'Sparrow' dir
+  sudo rm -rf "${BITSTACK_SPARROW_DIR}"
+  sudo mv Sparrow "${BITSTACK_SPARROW_DIR}"
+  sudo chown -R "${node_uid}:${node_gid}" "${BITSTACK_SPARROW_DIR}"
+
+  # desktop launcher
+  mkdir -p "${BITSTACK_NODE_HOME}/.local/share/applications"
+  cat > "${BITSTACK_NODE_HOME}/.local/share/applications/sparrow.desktop" <<DESKTOP
+[Desktop Entry]
+Name=Sparrow
+Comment=Bitcoin Wallet
+Exec=${BITSTACK_SPARROW_DIR}/bin/Sparrow
+Icon=${BITSTACK_SPARROW_DIR}/lib/Sparrow.png
+Terminal=false
+Type=Application
+Categories=Utility;Finance;
+DESKTOP
+  chown "${node_uid}:${node_gid}" "${BITSTACK_NODE_HOME}/.local/share/applications/sparrow.desktop"
+
+  # best-effort: point Sparrow at local electrs (won't overwrite an existing config)
+  mkdir -p "${BITSTACK_NODE_HOME}/.sparrow"
+  if [[ ! -f "${BITSTACK_NODE_HOME}/.sparrow/config" ]]; then
+    install -o "${node_uid}" -g "${node_gid}" -m 0644 \
+      "${SCRIPT_DIR}/sparrow-config.json" "${BITSTACK_NODE_HOME}/.sparrow/config"
+  fi
+  chown -R "${node_uid}:${node_gid}" "${BITSTACK_NODE_HOME}/.sparrow"
+
+  ok "Sparrow ${sparrow_version} installed."
+}
+
+# Picks the Electrum server for Sparrow and launches it, installing Sparrow
+# first if this is the first run. With no argument, defaults to 'local' when
+# electrs is reachable on 127.0.0.1:50001 (co-resident with this host) and
+# falls back to the Tor onion endpoint otherwise -- e.g. running this on a
+# separate client machine.
+cmd_sparrow() {
   local target=""
   while [[ $# -gt 0 ]]; do
     case "$1" in
-      help|-h|--help) help_wallet; return 0 ;;
+      help|-h|--help) help_sparrow; return 0 ;;
       local|onion)
-        [[ -z "$target" ]] || err "bitstack wallet: unexpected argument: $1 (see: bitstack wallet help)"
+        [[ -z "$target" ]] || err "bitstack sparrow: unexpected argument: $1 (see: bitstack sparrow help)"
         target="$1"; shift ;;
-      *) err "bitstack wallet: unexpected argument: $1 (see: bitstack wallet help)" ;;
+      *) err "bitstack sparrow: unexpected argument: $1 (see: bitstack sparrow help)" ;;
     esac
   done
 
   bitstack_require_node_user
-  [[ -x "${BITSTACK_SPARROW_DIR}/bin/Sparrow" ]] || err "Sparrow is not installed -- run ./setup.sh first."
-  command -v jq >/dev/null 2>&1 || err "jq is required to configure Sparrow -- run ./setup.sh first."
+  bitstack_ensure_sparrow_installed
 
   if [[ -z "$target" ]]; then
     if bitstack_electrs_local_reachable; then target="local"; else target="onion"; fi
@@ -343,7 +413,7 @@ main() {
     reset) shift; cmd_reset "$@" ;;
     bitcoin-cli) shift; cmd_bitcoin_cli "$@" ;;
     tor)    shift; cmd_tor "$@" ;;
-    wallet) shift; cmd_wallet "$@" ;;
+    sparrow) shift; cmd_sparrow "$@" ;;
     *) err "Unknown command: ${cmd}. Try 'bitstack help'" ;;
   esac
 }

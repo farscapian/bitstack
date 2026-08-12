@@ -7,13 +7,13 @@
 #   1) apt prerequisites
 #   2) symlink bitstack.sh to /usr/local/bin/bitstack (bare 'bitstack' command)
 #   3) docker-ce + single-node swarm (post-install step 'docker stack deploy' needs)
-#   4) install Sparrow (host GUI wallet), pointed at local electrs
 #
 # Building the local/bitcoind, local/electrs, and local/tor images
 # (GPG+SHA256 verified Bitcoin Core source) is 'bitstack up's job, not this
 # script's -- it builds each on first run and skips the build on later runs
-# once the tagged image already exists. Reads sparrow-config.json from its
-# own directory.
+# once the tagged image already exists. Installing Sparrow (host GUI wallet,
+# reading sparrow-config.json from its own directory) is 'bitstack sparrow's
+# job, likewise on first run only.
 #
 # Run as your regular login user (needs sudo). Not root. Deploying/stopping/resetting the
 # stack itself is bitstack.sh's job (bitstack up / down / reset) -- this script
@@ -45,10 +45,6 @@ main() {
   bitstack_require_node_user
   [[ "$(dpkg --print-architecture)" == amd64 ]] || err "This script assumes amd64."
   bitstack_require_siblings "${SCRIPT_DIR}"
-
-  local node_uid node_gid
-  node_uid="$(id -u "${BITSTACK_NODE_USER}")"
-  node_gid="$(id -g "${BITSTACK_NODE_USER}")"
 
   # ---------------------------------------------------------------- prereqs
   info "Installing prerequisites"
@@ -82,62 +78,11 @@ https://download.docker.com/linux/ubuntu $(. /etc/os-release && echo "${UBUNTU_C
     sudo docker swarm init >/dev/null 2>&1 || sudo docker swarm init --advertise-addr 127.0.0.1 >/dev/null
   fi
 
-  # ---------------------------------------------------------------- Sparrow (host)
-  local sparrow_version
-  sparrow_version="$(bitstack_latest_tag sparrowwallet/sparrow "${BITSTACK_SPARROW_FALLBACK}")"
-  info "Installing Sparrow ${sparrow_version}"
-  local tmp
-  tmp="$(mktemp -d)"
-  # expand tmp now: it's local, and set -e exiting mid-function drops
-  # locals before a deferred (single-quoted) EXIT trap would see them
-  # shellcheck disable=SC2064
-  trap "rm -rf '${tmp}'" EXIT
-  cd "${tmp}"
-
-  local tarball="sparrowwallet-${sparrow_version}-x86_64.tar.gz"
-  local manifest="sparrow-${sparrow_version}-manifest.txt"
-  local base="https://github.com/sparrowwallet/sparrow/releases/download/${sparrow_version}"
-  curl -fsSLO "${base}/${tarball}"
-  curl -fsSLO "${base}/${manifest}"
-  curl -fsSLO "${base}/${manifest}.asc"
-
-  # verify craig raw's signature over the manifest, then the tarball hash
-  curl -fsSL https://keybase.io/craigraw/pgp_keys.asc | gpg --import
-  gpg --verify "${manifest}.asc" "${manifest}"
-  sha256sum --ignore-missing -c "${manifest}"
-
-  tar -xzf "${tarball}"        # extracts a capitalized 'Sparrow' dir
-  sudo rm -rf "${BITSTACK_SPARROW_DIR}"
-  sudo mv Sparrow "${BITSTACK_SPARROW_DIR}"
-  sudo chown -R "${node_uid}:${node_gid}" "${BITSTACK_SPARROW_DIR}"
-
-  # desktop launcher
-  mkdir -p "${BITSTACK_NODE_HOME}/.local/share/applications"
-  cat > "${BITSTACK_NODE_HOME}/.local/share/applications/sparrow.desktop" <<DESKTOP
-[Desktop Entry]
-Name=Sparrow
-Comment=Bitcoin Wallet
-Exec=${BITSTACK_SPARROW_DIR}/bin/Sparrow
-Icon=${BITSTACK_SPARROW_DIR}/lib/Sparrow.png
-Terminal=false
-Type=Application
-Categories=Utility;Finance;
-DESKTOP
-  chown "${node_uid}:${node_gid}" "${BITSTACK_NODE_HOME}/.local/share/applications/sparrow.desktop"
-
-  # best-effort: point Sparrow at local electrs (won't overwrite an existing config)
-  mkdir -p "${BITSTACK_NODE_HOME}/.sparrow"
-  if [[ ! -f "${BITSTACK_NODE_HOME}/.sparrow/config" ]]; then
-    install -o "${node_uid}" -g "${node_gid}" -m 0644 \
-      "${SCRIPT_DIR}/sparrow-config.json" "${BITSTACK_NODE_HOME}/.sparrow/config"
-  fi
-  chown -R "${node_uid}:${node_gid}" "${BITSTACK_NODE_HOME}/.sparrow"
-
   ok "Setup complete."
   cat <<INFO
 
-Next:  bitstack up       deploy the bitcoind + electrs stack
-Sparrow: ${BITSTACK_SPARROW_DIR}/bin/Sparrow   (or 'bitstack wallet')
+Next:    bitstack up        deploy the bitcoind + electrs stack
+Wallet:  bitstack sparrow   installs Sparrow on first run, then launches it
 
 INFO
 }

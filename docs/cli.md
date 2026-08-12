@@ -4,12 +4,13 @@ Two entry points at the repo root, replacing the old `deploy-bitcoin-node.sh`:
 
 - **`./setup.sh`** -- one-time (re-runnable) dependency install: apt prereqs
   (including `jq`, used to patch Sparrow's config), docker-ce, single-node
-  swarm, installs Sparrow (host GUI wallet). Does NOT build any docker
-  images -- that is `bitstack up`'s job. Not a subcommand CLI -- just run it
-  directly. Also symlinks `bitstack.sh` to `/usr/local/bin/bitstack`
-  (`sudo ln -sf`) so the bare `bitstack` command below works from anywhere;
-  idempotent, and always resolves to the sibling `bitstack.sh` next to
-  `setup.sh` (the canonical local repo, when the human runs it).
+  swarm. Does NOT build any docker images -- that is `bitstack up`'s job --
+  and does NOT install Sparrow -- that is `bitstack sparrow`'s job, on its
+  own first run. Not a subcommand CLI -- just run it directly. Also symlinks
+  `bitstack.sh` to `/usr/local/bin/bitstack` (`sudo ln -sf`) so the bare
+  `bitstack` command below works from anywhere; idempotent, and always
+  resolves to the sibling `bitstack.sh` next to `setup.sh` (the canonical
+  local repo, when the human runs it).
 
 - **`bitstack.sh`** (bare command: `bitstack`, wired up by `./setup.sh`) --
   runtime control of the docker-swarm stack, built to
@@ -37,12 +38,15 @@ Two entry points at the repo root, replacing the old `deploy-bitcoin-node.sh`:
     `bitstack help bitcoin-cli` for this wrapper's own help.
   - `bitstack tor` -- print the onion address publishing electrs' Electrum
     RPC port (50001), querying the running `tor` service and caching it to
-    `.bitstack-onion` (gitignored, machine-local) for `bitstack wallet` to
+    `.bitstack-onion` (gitignored, machine-local) for `bitstack sparrow` to
     read later, including from a host that does not run the stack itself.
-  - `bitstack wallet [local|onion]` -- launch Sparrow, patching
-    `~/.sparrow/config`'s server fields (via `jq`) to point at either the
-    local electrs (`tcp://127.0.0.1:50001`) or the onion endpoint. With no
-    argument, auto-detects by checking whether something is listening on
+  - `bitstack sparrow [local|onion]` -- install Sparrow (host GUI wallet)
+    into `/opt/sparrow` if not already present, verifying the release
+    tarball via GPG signature + SHA256 manifest (idempotent -- skipped once
+    already installed), then launch it, patching `~/.sparrow/config`'s
+    server fields (via `jq`) to point at either the local electrs
+    (`tcp://127.0.0.1:50001`) or the onion endpoint. With no argument,
+    auto-detects by checking whether something is listening on
     `127.0.0.1:50001` -- local when electrs is co-resident with the caller,
     onion otherwise. Onion connections need no manual proxy setup: Sparrow
     starts its own bundled Tor client when the server URL is a `.onion`
@@ -71,7 +75,7 @@ hand (`docker volume rm`).
 *publishes* the hidden service, it does not proxy outbound connections for
 anyone. Clients reach the onion address with their own Tor client -- for
 Sparrow specifically, its bundled Tor starts automatically the moment its
-configured server is a `.onion` address (see `bitstack wallet` above), no
+configured server is a `.onion` address (see `bitstack sparrow` above), no
 separate `SocksPort`/proxy configuration needed.
 
 Both scripts must run as the configured node user (`BITSTACK_NODE_USER`,

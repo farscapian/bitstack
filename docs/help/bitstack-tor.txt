@@ -8,7 +8,7 @@ What it does:
   the stack's 'tor' service, so a remote Sparrow can reach it without any
   firewall port-forwarding. This command queries the running tor service for
   its current onion hostname and prints it, caching the result to
-  .bitstack-onion (machine-local, gitignored) for 'bitstack wallet' to use
+  .bitstack-onion (machine-local, gitignored) for 'bitstack sparrow' to use
   later -- including from a host that does not run the stack itself (copy
   that file there, or paste the address it prints).
 
@@ -24,4 +24,4 @@ Help:
   bitstack tor help
   bitstack help tor
 
-See also: docs/help/bitstack-wallet.txt, docs/help/bitstack-up.txt
+See also: docs/help/bitstack-sparrow.txt, docs/help/bitstack-up.txt
