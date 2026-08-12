@@ -44,6 +44,7 @@ help_requested() { case "${1:-}" in help|-h|--help) return 0 ;; *) return 1 ;; e
 usage()       { cat_help bitstack.txt; }
 help_up()     { cat_help bitstack-up.txt; }
 help_down()   { cat_help bitstack-down.txt; }
+help_restart() { cat_help bitstack-restart.txt; }
 help_reset()  { cat_help bitstack-reset.txt; }
 help_bitcoin_cli() { cat_help bitstack-bitcoin-cli.txt; }
 help_tor()    { cat_help bitstack-tor.txt; }
@@ -54,6 +55,7 @@ bitstack_help_topic() {
     ""|bitstack) usage ;;
     up)    help_up ;;
     down)  help_down ;;
+    restart) help_restart ;;
     reset) help_reset ;;
     bitcoin-cli) help_bitcoin_cli ;;
     tor)    help_tor ;;
@@ -163,6 +165,16 @@ cmd_down() {
   bitstack_require_node_user
   bitstack_do_down
   ok "Stack '${BITSTACK_STACK_NAME}' stopped. Node data under ${BITSTACK_BITCOIN_DIR} was left in place."
+}
+
+# 'bitstack down' followed by 'bitstack up'. Node data is left in place
+# (down doesn't touch it); up rebuilds/redeploys as usual.
+cmd_restart() {
+  help_requested "${1:-}" && { help_restart; return 0; }
+  (( $# == 0 )) || err "bitstack restart: unexpected argument: $1 (see: bitstack restart help)"
+
+  cmd_down
+  cmd_up
 }
 
 # TWO interactive confirmations gate deleting blocks/chainstate/wallets: a
@@ -413,6 +425,7 @@ main() {
       ;;
     up)    shift; cmd_up "$@" ;;
     down)  shift; cmd_down "$@" ;;
+    restart) shift; cmd_restart "$@" ;;
     reset) shift; cmd_reset "$@" ;;
     bitcoin-cli) shift; cmd_bitcoin_cli "$@" ;;
     tor)    shift; cmd_tor "$@" ;;

@@ -25,6 +25,7 @@ Two entry points at the repo root, replacing the old `deploy-bitcoin-node.sh`:
     deploys the stack (idempotent). Also waits for the `tor` service to
     publish its hidden service and prints the onion address.
   - `bitstack down` -- stop the stack; node data is left in place
+  - `bitstack restart` -- `bitstack down` followed by `bitstack up`
   - `bitstack reset` -- stop the stack, remove the electrs volume, and DELETE
     `~/.bitcoin/*`. Requires two interactive confirmations before deleting
     `blocks/`, `chainstate/`, or `wallets/` (or `-f/--force` to skip, for

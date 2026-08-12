@@ -1,0 +1,22 @@
+bitstack restart -- stop and redeploy the bitcoind + electrs stack
+
+Usage:
+  bitstack restart
+
+What it does:
+  Runs 'bitstack down' followed by 'bitstack up': removes the 'bitstack'
+  docker stack, waits for its services to fully terminate, then redeploys
+  it (see docs/help/bitstack-down.txt and docs/help/bitstack-up.txt for
+  what each half does).
+
+Node data under ~/.bitcoin and the electrs database volume are left in
+place throughout -- 'up' picks up right where 'down' left off. The onion
+address is also unaffected (its key lives in a separate docker volume that
+neither command touches).
+
+Help:
+  bitstack restart help
+  bitstack help restart
+
+See also: docs/help/bitstack-up.txt, docs/help/bitstack-down.txt,
+docs/help/bitstack-reset.txt

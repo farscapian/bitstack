@@ -8,6 +8,7 @@ Commands:
 
   up                  deploy the bitcoind + electrs + tor stack
   down                stop the stack; node data is left in place
+  restart             stop then redeploy the stack (down + up)
   reset               stop the stack and DELETE all node data (~/.bitcoin/*)
   bitcoin-cli         run bitcoin-cli against the running bitcoind container
   tor                 show the Tor onion address for electrs' Electrum RPC
@@ -26,5 +27,6 @@ First-time setup (docker, swarm): ./setup.sh -- 'bitstack sparrow' installs
 the Sparrow wallet itself, on its own first run.
 
 See also: docs/help/bitstack-up.txt, docs/help/bitstack-down.txt,
-docs/help/bitstack-reset.txt, docs/help/bitstack-bitcoin-cli.txt,
-docs/help/bitstack-tor.txt, docs/help/bitstack-sparrow.txt
+docs/help/bitstack-restart.txt, docs/help/bitstack-reset.txt,
+docs/help/bitstack-bitcoin-cli.txt, docs/help/bitstack-tor.txt,
+docs/help/bitstack-sparrow.txt

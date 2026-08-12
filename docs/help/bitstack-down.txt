@@ -17,5 +17,6 @@ Help:
   bitstack down help
   bitstack help down
 
-See also: docs/help/bitstack-up.txt, docs/help/bitstack-reset.txt,
-docs/help/bitstack-bitcoin-cli.txt, docs/help/bitstack-tor.txt
+See also: docs/help/bitstack-up.txt, docs/help/bitstack-restart.txt,
+docs/help/bitstack-reset.txt, docs/help/bitstack-bitcoin-cli.txt,
+docs/help/bitstack-tor.txt
