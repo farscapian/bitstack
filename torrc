@@ -1,14 +1,16 @@
 # Publishes electrs' Electrum RPC port (50001) as a Tor hidden service.
 # No local SocksPort: this daemon only publishes the service; clients (e.g.
-# Sparrow) run their own Tor to reach it -- see 'bitstack wallet'.
+# Sparrow) run their own Tor to reach it -- see 'bitstack sparrow'.
 SocksPort 0
 RunAsDaemon 0
 Log notice stdout
 
-# Started as root (see tor.Dockerfile); Tor itself fixes ownership/perms on
-# DataDirectory and HiddenServiceDir before dropping privileges to this user,
-# which is what lets HiddenServiceDir live on a plain docker volume (created
-# root-owned) without a custom entrypoint script.
+# tor-entrypoint.sh (started as root, see tor.Dockerfile) chowns
+# DataDirectory and HiddenServiceDir to this user before exec'ing tor --
+# Tor fixes DataDirectory ownership itself, but treats a HiddenServiceDir
+# not already owned by this user as a hard security error rather than
+# fixing it, so the docker-managed (root-owned by default) volume needs
+# that chown done for it first.
 User debian-tor
 
 DataDirectory /var/lib/tor

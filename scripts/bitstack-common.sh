@@ -25,11 +25,11 @@ BITSTACK_ELECTRS_FALLBACK="v0.11.1"
 BITSTACK_SPARROW_FALLBACK="2.5.3"
 
 # local/tor has no upstream release to track (tor.Dockerfile just installs the
-# distro tor package) -- bump this by hand whenever tor.Dockerfile changes in a
-# way that should invalidate the cached image.
-BITSTACK_TOR_IMAGE_VERSION="1"
+# distro tor package) -- bump this by hand whenever tor.Dockerfile, torrc, or
+# tor-entrypoint.sh change in a way that should invalidate the cached image.
+BITSTACK_TOR_IMAGE_VERSION="2"
 
-BITSTACK_SIBLINGS=(bitcoind.Dockerfile electrs.Dockerfile tor.Dockerfile torrc btc-stack.yml bitcoin.conf sparrow-config.json)
+BITSTACK_SIBLINGS=(bitcoind.Dockerfile electrs.Dockerfile tor.Dockerfile torrc tor-entrypoint.sh btc-stack.yml bitcoin.conf sparrow-config.json)
 
 # Fail unless invoked as BITSTACK_NODE_USER (needs sudo for docker/apt, but must
 # not run as root itself -- matches the original deploy-bitcoin-node.sh guard).

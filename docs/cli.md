@@ -78,6 +78,14 @@ Sparrow specifically, its bundled Tor starts automatically the moment its
 configured server is a `.onion` address (see `bitstack sparrow` above), no
 separate `SocksPort`/proxy configuration needed.
 
+`tor-entrypoint.sh` runs as root (no `USER` in `tor.Dockerfile`) and chowns
+`/var/lib/tor` -- including the `tor-hidden-service` volume, root-owned by
+default on first mount -- to `debian-tor` before exec'ing `tor`. Tor fixes
+`DataDirectory` ownership itself when started as root, but treats a
+`HiddenServiceDir` it doesn't already own as a hard security error and
+refuses to fix it, so the docker volume needs that chown done for it on
+every container start.
+
 Both scripts must run as the configured node user (`BITSTACK_NODE_USER`,
 defaults to the invoking user), never as root -- they call `sudo` themselves
 for the privileged steps (apt, docker).
