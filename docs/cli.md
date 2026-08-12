@@ -47,6 +47,25 @@ Two entry points at the repo root, replacing the old `deploy-bitcoin-node.sh`:
     RPC port (50001), querying the running `tor` service and caching it to
     `.bitstack-onion` (gitignored, machine-local) for `bitstack sparrow` to
     read later, including from a host that does not run the stack itself.
+  - `bitstack electrs rotate [-f|--force]` -- scale the `tor` service to 0,
+    wipe the `tor-hidden-service` volume, scale it back to 1 so Tor
+    generates a brand-new v3 address, then cache the new address like
+    `bitstack up`/`bitstack tor` do. Irreversible (the old address stops
+    resolving once its key is gone); prompts for confirmation unless
+    `-f`/`--force`.
+  - `bitstack electrs set key <private_key>` -- same stop/wipe/restart
+    cycle, but writes a specific Tor v3 private key into the volume
+    instead of letting Tor generate one, so the resulting `.onion` address
+    is one already under the caller's control (restoring a prior identity,
+    a vanity address from a tool like `mkp224o`, etc.). Accepts the
+    `ED25519-V3:<base64>` form (Tor's `ADD_ONION` control-command format,
+    also what most vanity-address generators emit) or the bare base64 of
+    the same 64 raw bytes. Only the secret key file is written -- Tor
+    derives the matching public key and `.onion` hostname from it itself
+    on next start, the same code path used for a freshly generated key.
+    Both subcommands reuse the already-built `local/tor` image (via
+    `docker run --entrypoint sh ... find/cp`) to touch the volume, so
+    neither needs an extra pull or build.
   - `bitstack sparrow [local|onion]` -- install Sparrow (host GUI wallet)
     into `/opt/sparrow` if not already present, verifying the release
     tarball via GPG signature + SHA256 manifest (idempotent -- skipped once
@@ -75,8 +94,8 @@ without any firewall port-forwarding. It has no published ports of its own --
 only outbound access to the Tor network plus the `btc` overlay network to
 reach `electrs:50001`. The hidden-service private key lives in the
 `tor-hidden-service` docker volume, keeping the onion address stable across
-`bitstack up`/`down`/`reset`; it only changes if that volume is removed by
-hand (`docker volume rm`).
+`bitstack up`/`down`/`reset`; use `bitstack electrs rotate` or `bitstack
+electrs set key` to change it deliberately (see above).
 
 `torrc` (`/etc/tor/torrc` in the image) sets `SocksPort 0`: this daemon only
 *publishes* the hidden service, it does not proxy outbound connections for

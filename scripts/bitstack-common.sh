@@ -164,3 +164,18 @@ bitstack_wait_stack_gone() {
   done
   return 0
 }
+
+# Wait (best-effort) for a single service to have zero running tasks, after
+# scaling it to 0 replicas -- so a caller that touches its volume next does
+# not race a still-terminating container.
+bitstack_wait_service_idle() {
+  local service="$1" timeout="${2:-60}" waited=0
+  while sudo docker service ps "${service}" \
+      --filter "desired-state=running" \
+      --format '{{.ID}}' 2>/dev/null | grep -q .; do
+    ((waited >= timeout)) && return 1
+    sleep 1
+    ((waited += 1))
+  done
+  return 0
+}

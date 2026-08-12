@@ -48,6 +48,7 @@ help_restart() { cat_help bitstack-restart.txt; }
 help_reset()  { cat_help bitstack-reset.txt; }
 help_bitcoin_cli() { cat_help bitstack-bitcoin-cli.txt; }
 help_tor()    { cat_help bitstack-tor.txt; }
+help_electrs() { cat_help bitstack-electrs.txt; }
 help_sparrow() { cat_help bitstack-sparrow.txt; }
 
 bitstack_help_topic() {
@@ -59,6 +60,7 @@ bitstack_help_topic() {
     reset) help_reset ;;
     bitcoin-cli) help_bitcoin_cli ;;
     tor)    help_tor ;;
+    electrs) help_electrs ;;
     sparrow) help_sparrow ;;
     *) err "bitstack: unknown help topic: ${1} (try: bitstack help)" ;;
   esac
@@ -282,6 +284,141 @@ cmd_tor() {
   ok "Onion endpoint: tcp://${host}:50001"
 }
 
+# Common precondition for 'bitstack electrs rotate'/'set key': the stack
+# must be running, and specifically the tor image their helper container
+# reuses to touch the hidden-service volume must already exist locally.
+bitstack_electrs_require_stack() {
+  bitstack_require_node_user
+  bitstack_stack_exists || err "Stack '${BITSTACK_STACK_NAME}' is not running -- run 'bitstack up' first."
+  bitstack_image_present "local/tor:${BITSTACK_TOR_IMAGE_VERSION}" \
+    || err "local/tor:${BITSTACK_TOR_IMAGE_VERSION} image not found -- run 'bitstack up' first."
+}
+
+# Wipes the tor hidden-service volume so Tor generates a brand-new v3
+# onion address on next start. Run only while the tor service has zero
+# replicas (see bitstack_electrs_rekey) -- it isn't safe to yank key
+# material out from under a running Tor.
+bitstack_electrs_wipe_hs() {
+  sudo docker run --rm --entrypoint sh \
+    -v "${BITSTACK_STACK_NAME}_tor-hidden-service:/hs" \
+    "local/tor:${BITSTACK_TOR_IMAGE_VERSION}" \
+    -c 'find /hs -mindepth 1 -delete'
+}
+
+# Writes $1 -- a Tor v3 onion service private key, either the
+# "ED25519-V3:<base64>" form (as used by Tor's ADD_ONION control command
+# and most vanity-address generators) or the bare base64 of the same 64
+# raw bytes -- as the hidden service's secret key, replacing whatever was
+# there. Only the secret key file is written; Tor derives the matching
+# public key and .onion hostname from it itself on next start -- the same
+# code path it uses to derive them for a freshly *generated* secret, so
+# there is no need to compute or supply those separately here. Run only
+# while the tor service has zero replicas (see bitstack_electrs_rekey).
+bitstack_electrs_write_key() {
+  local key="$1" b64="$1"
+  [[ "$key" == ED25519-V3:* ]] && b64="${key#ED25519-V3:}"
+
+  local tmp
+  tmp="$(mktemp -d)"
+  # shellcheck disable=SC2064
+  trap "rm -rf '${tmp}'" RETURN
+
+  # 32-byte Tor key-file header, then the 64 raw expanded-secret-key bytes
+  printf '== ed25519v1-secret: type0 ==\0\0\0' > "${tmp}/hs_ed25519_secret_key"
+  printf '%s' "${b64}" | base64 -d >> "${tmp}/hs_ed25519_secret_key" 2>/dev/null \
+    || err "bitstack electrs set key: not valid base64"
+  chmod 600 "${tmp}/hs_ed25519_secret_key"
+
+  local size
+  size="$(stat -c%s "${tmp}/hs_ed25519_secret_key")"
+  (( size == 96 )) \
+    || err "bitstack electrs set key: expected a 64-byte private key, got $((size - 32)) bytes after base64 decoding -- pass the ED25519-V3:<base64> form of a Tor v3 onion service private key"
+
+  sudo docker run --rm --entrypoint sh \
+    -v "${BITSTACK_STACK_NAME}_tor-hidden-service:/hs" \
+    -v "${tmp}:/src:ro" \
+    "local/tor:${BITSTACK_TOR_IMAGE_VERSION}" \
+    -c 'find /hs -mindepth 1 -delete && cp /src/hs_ed25519_secret_key /hs/hs_ed25519_secret_key && chmod 600 /hs/hs_ed25519_secret_key'
+}
+
+# Scales the tor service to 0, waits for it to actually stop (so nothing
+# else has the hidden-service volume open), runs $1 (a bitstack_electrs_*
+# mutator, plus any further args) against it, then scales tor back to 1
+# and waits for the (new) onion address, caching it to BITSTACK_ONION_FILE
+# like 'bitstack up'/'bitstack tor' do. Shared by 'bitstack electrs
+# rotate' and 'bitstack electrs set key'. Callers must have already run
+# bitstack_electrs_require_stack.
+bitstack_electrs_rekey() {
+  local mutator="$1"; shift
+
+  info "Stopping tor service"
+  sudo docker service scale "${BITSTACK_STACK_NAME}_tor=0" >/dev/null
+  bitstack_wait_service_idle "${BITSTACK_STACK_NAME}_tor" 60 \
+    || err "Timed out waiting for the tor service to stop -- check: sudo docker service ps ${BITSTACK_STACK_NAME}_tor"
+
+  "$mutator" "$@"
+
+  info "Restarting tor service"
+  sudo docker service scale "${BITSTACK_STACK_NAME}_tor=1" >/dev/null
+
+  info "Waiting for the new onion address to publish (can take up to a minute)"
+  local onion_host
+  if onion_host="$(bitstack_wait_onion_hostname 60)"; then
+    printf '%s\n' "${onion_host}" > "${BITSTACK_ONION_FILE}"
+    ok "New onion address: tcp://${onion_host}:50001"
+  else
+    warn "Tor hidden service not ready yet -- check: sudo docker service logs -f ${BITSTACK_STACK_NAME}_tor"
+  fi
+}
+
+cmd_electrs_rotate() {
+  local force=0
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      help|-h|--help) help_electrs; return 0 ;;
+      -f|--force) force=1; shift ;;
+      *) err "bitstack electrs rotate: unexpected argument: $1 (see: bitstack electrs help)" ;;
+    esac
+  done
+
+  bitstack_electrs_require_stack
+
+  if (( ! force )); then
+    warn "This permanently discards the current onion address -- anything configured to reach it (Sparrow, bookmarks, etc.) will need the new one."
+    local reply
+    read -r -p "Rotate the onion address now? [y/N] " reply </dev/tty
+    case "${reply,,}" in y|yes) ;; *) info "Aborted; onion address unchanged."; return 0 ;; esac
+  fi
+
+  bitstack_electrs_rekey bitstack_electrs_wipe_hs
+}
+
+cmd_electrs_set() {
+  case "${1:-}" in
+    help|-h|--help) help_electrs; return 0 ;;
+    key) shift ;;
+    "") err "bitstack electrs set: missing subcommand (see: bitstack electrs help)" ;;
+    *) err "bitstack electrs set: unknown subcommand: $1 (see: bitstack electrs help)" ;;
+  esac
+
+  help_requested "${1:-}" && { help_electrs; return 0; }
+  (( $# == 1 )) || err "bitstack electrs set key: expected exactly one argument, the private key (see: bitstack electrs help)"
+
+  bitstack_electrs_require_stack
+  warn "This replaces the current onion address -- anything configured to reach the old one (Sparrow, bookmarks, etc.) will need the new one."
+  bitstack_electrs_rekey bitstack_electrs_write_key "$1"
+}
+
+cmd_electrs() {
+  case "${1:-}" in
+    help|-h|--help) help_electrs; return 0 ;;
+    rotate) shift; cmd_electrs_rotate "$@" ;;
+    set)    shift; cmd_electrs_set "$@" ;;
+    "") err "bitstack electrs: missing subcommand (see: bitstack electrs help)" ;;
+    *) err "bitstack electrs: unknown subcommand: $1 (see: bitstack electrs help)" ;;
+  esac
+}
+
 # Idempotently patches ~/.sparrow/config so Sparrow points at the given
 # Electrum server on next launch, preserving every other Sparrow preference
 # (wallet list, theme, etc.) already in that file.
@@ -429,6 +566,7 @@ main() {
     reset) shift; cmd_reset "$@" ;;
     bitcoin-cli) shift; cmd_bitcoin_cli "$@" ;;
     tor)    shift; cmd_tor "$@" ;;
+    electrs) shift; cmd_electrs "$@" ;;
     sparrow) shift; cmd_sparrow "$@" ;;
     *) err "Unknown command: ${cmd}. Try 'bitstack help'" ;;
   esac

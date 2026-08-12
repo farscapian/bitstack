@@ -1,0 +1,39 @@
+bitstack electrs -- manage the onion identity publishing electrs' Electrum RPC
+
+Usage:
+  bitstack electrs rotate [-f|--force]
+  bitstack electrs set key <private_key>
+
+What it does:
+  Both subcommands stop the 'tor' service, replace the hidden-service key
+  material in the 'tor-hidden-service' docker volume, restart the service,
+  and wait for the (new) onion address to publish -- caching it to
+  .bitstack-onion, same as 'bitstack up'/'bitstack tor'. Node data, electrs,
+  and bitcoind are untouched throughout; only the tor service is bounced.
+
+  rotate
+    Discards the current onion address and lets Tor generate a brand-new
+    one. Irreversible -- the old address stops resolving the moment its
+    key is gone. Prompts for confirmation unless -f/--force is given.
+
+  set key <private_key>
+    Installs a specific Tor v3 onion service private key instead of
+    generating one, so the resulting .onion address is one you already
+    control -- e.g. restoring a previous identity, or a vanity address
+    generated with a tool like mkp224o. Accepts the "ED25519-V3:<base64>"
+    form (as used by Tor's ADD_ONION control command and most
+    vanity-address generators) or the bare base64 of the same 64 raw
+    bytes. Only the secret key is written; Tor derives the matching public
+    key and .onion hostname from it itself on next start -- the same code
+    path it uses to derive them for a freshly generated key, so there is
+    no need to supply those separately.
+
+Requires the stack to be running ('bitstack up' first) -- the tor image it
+was built with is reused to touch the volume, so neither subcommand needs
+an extra download or build.
+
+Help:
+  bitstack electrs help
+  bitstack help electrs
+
+See also: docs/help/bitstack-tor.txt, docs/help/bitstack-up.txt

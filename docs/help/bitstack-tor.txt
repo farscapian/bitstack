@@ -17,11 +17,12 @@ What it does:
 
 Requires the stack to have been deployed at least once ('bitstack up') so a
 hidden-service key exists. The address is stable across restarts and
-redeploys (the key lives in a docker volume); it only changes if that volume
-is removed.
+redeploys (the key lives in a docker volume); use 'bitstack electrs rotate'
+or 'bitstack electrs set key' to change it deliberately.
 
 Help:
   bitstack tor help
   bitstack help tor
 
-See also: docs/help/bitstack-sparrow.txt, docs/help/bitstack-up.txt
+See also: docs/help/bitstack-electrs.txt, docs/help/bitstack-sparrow.txt,
+docs/help/bitstack-up.txt
