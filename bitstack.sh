@@ -158,6 +158,11 @@ bitstack_do_down() {
   sudo docker stack rm "${BITSTACK_STACK_NAME}"
   bitstack_wait_stack_gone 120 \
     || warn "Timed out waiting for '${BITSTACK_STACK_NAME}' services to fully terminate; check: sudo docker service ls"
+  # Network teardown lags service removal -- redeploying (e.g. 'bitstack
+  # restart') before it finishes can race 'docker stack deploy' and fail
+  # with "network ... not found" (see bitstack_wait_network_gone).
+  bitstack_wait_network_gone 60 \
+    || warn "Timed out waiting for the '${BITSTACK_STACK_NAME}_btc' network to fully terminate; check: sudo docker network ls"
 }
 
 cmd_down() {

@@ -165,6 +165,23 @@ bitstack_wait_stack_gone() {
   return 0
 }
 
+# Wait (best-effort) for the stack's overlay network to fully disappear
+# after 'docker stack rm'. Network teardown is asynchronous and can lag
+# well behind 'docker stack rm' returning (unlike service removal, which
+# bitstack_wait_stack_gone already covers) -- a caller that redeploys
+# right after (e.g. 'bitstack restart') can otherwise race a
+# still-tearing-down network and hit "network ... not found" from
+# 'docker stack deploy'.
+bitstack_wait_network_gone() {
+  local timeout="${1:-60}" waited=0
+  while sudo docker network inspect "${BITSTACK_STACK_NAME}_btc" >/dev/null 2>&1; do
+    ((waited >= timeout)) && return 1
+    sleep 1
+    ((waited += 1))
+  done
+  return 0
+}
+
 # Wait (best-effort) for a single service to have zero running tasks, after
 # scaling it to 0 replicas -- so a caller that touches its volume next does
 # not race a still-terminating container.
