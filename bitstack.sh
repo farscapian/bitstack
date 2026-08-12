@@ -47,7 +47,6 @@ help_down()   { cat_help bitstack-down.txt; }
 help_restart() { cat_help bitstack-restart.txt; }
 help_reset()  { cat_help bitstack-reset.txt; }
 help_bitcoin_cli() { cat_help bitstack-bitcoin-cli.txt; }
-help_tor()    { cat_help bitstack-tor.txt; }
 help_electrs() { cat_help bitstack-electrs.txt; }
 help_sparrow() { cat_help bitstack-sparrow.txt; }
 
@@ -59,7 +58,6 @@ bitstack_help_topic() {
     restart) help_restart ;;
     reset) help_reset ;;
     bitcoin-cli) help_bitcoin_cli ;;
-    tor)    help_tor ;;
     electrs) help_electrs ;;
     sparrow) help_sparrow ;;
     *) err "bitstack: unknown help topic: ${1} (try: bitstack help)" ;;
@@ -132,7 +130,7 @@ cmd_up() {
     onion_line="tcp://${onion_host}:50001"
   else
     warn "Tor hidden service not ready yet -- check: sudo docker service logs -f ${BITSTACK_STACK_NAME}_tor"
-    onion_line="pending -- run 'bitstack tor' once the tor service is up"
+    onion_line="pending -- run 'bitstack electrs tor' once the tor service is up"
   fi
 
   cat <<INFO
@@ -287,29 +285,6 @@ cmd_bitcoin_cli() {
   return "${status}"
 }
 
-# Shows the Tor onion address publishing electrs' Electrum RPC port,
-# querying the running tor service and caching the result to
-# BITSTACK_ONION_FILE for 'bitstack sparrow' to use later (including from a
-# host that does not run the stack itself -- copy that file there).
-cmd_tor() {
-  help_requested "${1:-}" && { help_tor; return 0; }
-  (( $# == 0 )) || err "bitstack tor: unexpected argument: $1 (see: bitstack tor help)"
-
-  bitstack_require_node_user
-
-  local host
-  if host="$(bitstack_wait_onion_hostname 5)"; then
-    printf '%s\n' "${host}" > "${BITSTACK_ONION_FILE}"
-  elif [[ -f "${BITSTACK_ONION_FILE}" ]]; then
-    host="$(<"${BITSTACK_ONION_FILE}")"
-    warn "Tor hidden service not reachable right now; showing the last-known address."
-  else
-    err "No onion endpoint known -- run 'bitstack up' first."
-  fi
-
-  ok "Onion endpoint: tcp://${host}:50001"
-}
-
 # Common precondition for 'bitstack electrs rotate'/'set key': the stack
 # must be running, and specifically the tor image their helper container
 # reuses to touch the hidden-service volume must already exist locally.
@@ -371,7 +346,7 @@ bitstack_electrs_write_key() {
 # else has the hidden-service volume open), runs $1 (a bitstack_electrs_*
 # mutator, plus any further args) against it, then scales tor back to 1
 # and waits for the (new) onion address, caching it to BITSTACK_ONION_FILE
-# like 'bitstack up'/'bitstack tor' do. Shared by 'bitstack electrs
+# like 'bitstack up'/'bitstack electrs tor' do. Shared by 'bitstack electrs
 # rotate' and 'bitstack electrs set key'. Callers must have already run
 # bitstack_electrs_require_stack.
 bitstack_electrs_rekey() {
@@ -435,12 +410,35 @@ cmd_electrs_set() {
   bitstack_electrs_rekey bitstack_electrs_write_key "$1"
 }
 
+# Shows the Tor onion address publishing electrs' Electrum RPC port,
+# querying the running tor service and caching the result to
+# BITSTACK_ONION_FILE for 'bitstack sparrow' to use later (including from a
+# host that does not run the stack itself -- copy that file there).
+cmd_electrs_tor() {
+  help_requested "${1:-}" && { help_electrs; return 0; }
+  (( $# == 0 )) || err "bitstack electrs tor: unexpected argument: $1 (see: bitstack electrs help)"
+
+  bitstack_require_node_user
+
+  local host
+  if host="$(bitstack_wait_onion_hostname 5)"; then
+    printf '%s\n' "${host}" > "${BITSTACK_ONION_FILE}"
+  elif [[ -f "${BITSTACK_ONION_FILE}" ]]; then
+    host="$(<"${BITSTACK_ONION_FILE}")"
+    warn "Tor hidden service not reachable right now; showing the last-known address."
+  else
+    err "No onion endpoint known -- run 'bitstack up' first."
+  fi
+
+  ok "Onion endpoint: tcp://${host}:50001"
+}
+
 cmd_electrs() {
   case "${1:-}" in
-    help|-h|--help) help_electrs; return 0 ;;
+    ""|help|-h|--help) help_electrs; return 0 ;;
     rotate) shift; cmd_electrs_rotate "$@" ;;
     set)    shift; cmd_electrs_set "$@" ;;
-    "") err "bitstack electrs: missing subcommand (see: bitstack electrs help)" ;;
+    tor)    shift; cmd_electrs_tor "$@" ;;
     *) err "bitstack electrs: unknown subcommand: $1 (see: bitstack electrs help)" ;;
   esac
 }
@@ -564,7 +562,7 @@ cmd_sparrow() {
   else
     local onion_host
     onion_host="$(bitstack_resolve_onion_host)" \
-      || err "No onion endpoint known -- run 'bitstack up' or 'bitstack tor' on the electrs host, or copy its ${BITSTACK_ONION_FILE} here."
+      || err "No onion endpoint known -- run 'bitstack up' or 'bitstack electrs tor' on the electrs host, or copy its ${BITSTACK_ONION_FILE} here."
     electrum_url="tcp://${onion_host}:50001"
   fi
 
@@ -591,7 +589,6 @@ main() {
     restart) shift; cmd_restart "$@" ;;
     reset) shift; cmd_reset "$@" ;;
     bitcoin-cli) shift; cmd_bitcoin_cli "$@" ;;
-    tor)    shift; cmd_tor "$@" ;;
     electrs) shift; cmd_electrs "$@" ;;
     sparrow) shift; cmd_sparrow "$@" ;;
     *) err "Unknown command: ${cmd}. Try 'bitstack help'" ;;

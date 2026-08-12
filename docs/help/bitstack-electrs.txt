@@ -1,15 +1,26 @@
 bitstack electrs -- manage the onion identity publishing electrs' Electrum RPC
 
 Usage:
+  bitstack electrs
+  bitstack electrs tor
   bitstack electrs rotate [-f|--force]
   bitstack electrs set key <private_key>
 
+With no subcommand, prints this help.
+
 What it does:
-  Both subcommands stop the 'tor' service, replace the hidden-service key
-  material in the 'tor-hidden-service' docker volume, restart the service,
-  and wait for the (new) onion address to publish -- caching it to
-  .bitstack-onion, same as 'bitstack up'/'bitstack tor'. Node data, electrs,
-  and bitcoind are untouched throughout; only the tor service is bounced.
+  tor
+    electrs' Electrum RPC port (50001) is published as a Tor hidden
+    service by the stack's 'tor' service, so a remote Sparrow can reach it
+    without any firewall port-forwarding. This queries the running tor
+    service for its current onion hostname and prints it, caching the
+    result to .bitstack-onion (machine-local, gitignored) for 'bitstack
+    sparrow' to use later -- including from a host that does not run the
+    stack itself (copy that file there, or paste the address it prints).
+    If the tor service is not reachable right now, falls back to the
+    last-known address (with a warning) instead of failing outright.
+    Requires the stack to have been deployed at least once ('bitstack up')
+    so a hidden-service key exists.
 
   rotate
     Discards the current onion address and lets Tor generate a brand-new
@@ -28,12 +39,21 @@ What it does:
     path it uses to derive them for a freshly generated key, so there is
     no need to supply those separately.
 
-Requires the stack to be running ('bitstack up' first) -- the tor image it
-was built with is reused to touch the volume, so neither subcommand needs
-an extra download or build.
+  rotate and set key both stop the 'tor' service, replace the
+  hidden-service key material in the 'tor-hidden-service' docker volume,
+  restart the service, and wait for the (new) onion address to publish --
+  caching it to .bitstack-onion, same as tor above. Node data, electrs,
+  and bitcoind are untouched throughout; only the tor service is bounced.
+
+The address is stable across restarts and redeploys (the key lives in a
+docker volume) -- rotate/set key change it deliberately; nothing else does.
+
+Requires the stack to be running ('bitstack up' first). rotate and set key
+also reuse the already-built local/tor image to touch the volume, so
+neither needs an extra download or build.
 
 Help:
   bitstack electrs help
   bitstack help electrs
 
-See also: docs/help/bitstack-tor.txt, docs/help/bitstack-up.txt
+See also: docs/help/bitstack-sparrow.txt, docs/help/bitstack-up.txt

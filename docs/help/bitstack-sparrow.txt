@@ -16,7 +16,7 @@ What it does:
   theme, etc. -- is left untouched):
 
     local  -- tcp://127.0.0.1:50001, direct connection to electrs
-    onion  -- electrs' Tor hidden service address (see: bitstack help tor)
+    onion  -- electrs' Tor hidden service address (see: bitstack help electrs)
 
   With no argument, auto-detects: 'local' when something is listening on
   127.0.0.1:50001 (electrs is co-resident with this host), 'onion'
@@ -29,10 +29,11 @@ What it does:
 
 Requires jq (installed by ./setup.sh). For 'onion' (or auto-detect falling
 back to it), a known onion address is required too -- run 'bitstack up' or
-'bitstack tor' on the electrs host first (see: docs/help/bitstack-tor.txt).
+'bitstack electrs tor' on the electrs host first (see:
+docs/help/bitstack-electrs.txt).
 
 Help:
   bitstack sparrow help
   bitstack help sparrow
 
-See also: docs/help/bitstack-tor.txt, docs/help/bitstack-up.txt
+See also: docs/help/bitstack-electrs.txt, docs/help/bitstack-up.txt
