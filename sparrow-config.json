@@ -2,5 +2,10 @@
   "mode": "ONLINE",
   "serverType": "ELECTRUM_SERVER",
   "electrumServer": "tcp://127.0.0.1:50001",
-  "useProxy": false
+  "useProxy": false,
+  "hideAmounts": true,
+  "bitcoinUnit": "SATOSHIS",
+  "exchangeSource": "NONE",
+  "feeRatesSource": "ELECTRUM_SERVER",
+  "blockExplorer": "http://none"
 }

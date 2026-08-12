@@ -8,12 +8,13 @@ Usage:
 What it does:
   On first run, installs Sparrow into /opt/sparrow, verifying the release
   tarball via craigraw's GPG signature over the release manifest and the
-  manifest's SHA256 hash. Later runs skip straight to launch since Sparrow
-  is already installed.
+  manifest's SHA256 hash, and seeds ~/.sparrow/config from sparrow-config.json
+  (see Defaults below). Later runs skip straight to launch since Sparrow is
+  already installed.
 
   Picks an Electrum server for Sparrow and launches it, patching
   ~/.sparrow/config in place (every other Sparrow preference -- wallet list,
-  theme, etc. -- is left untouched):
+  fiat currency, etc. -- is left untouched):
 
     local  -- tcp://127.0.0.1:50001, direct connection to electrs
     onion  -- electrs' Tor hidden service address (see: bitstack help electrs)
@@ -26,6 +27,23 @@ What it does:
   Connecting over onion needs no manual Tor/proxy setup: Sparrow detects the
   .onion address in the server URL and starts its own bundled Tor client
   automatically.
+
+  Also detects the desktop's light/dark setting on every launch (GNOME's
+  color-scheme preference, falling back to checking the gtk-theme name for
+  "dark") and patches Sparrow's theme to match -- Sparrow itself has no such
+  detection built in. Left untouched if no signal is available (e.g.
+  headless, or a desktop this doesn't recognize).
+
+Defaults (sparrow-config.json, applied on first install only -- edit
+~/.sparrow/config or use Sparrow's own Preferences afterwards to change
+them):
+  hideAmounts:     true            balances/amounts hidden until toggled
+  bitcoinUnit:     SATOSHIS        sats, not BTC
+  exchangeSource:  NONE            no fiat exchange rate lookups
+  feeRatesSource:  ELECTRUM_SERVER fee estimates from the connected node
+                                   (mempool + recent blocks), not a
+                                   third-party API
+  blockExplorer:   http://none     no external block explorer links
 
 Requires jq (installed by ./setup.sh). For 'onion' (or auto-detect falling
 back to it), a known onion address is required too -- run 'bitstack up' or

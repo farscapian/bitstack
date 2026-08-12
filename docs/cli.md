@@ -78,14 +78,31 @@ Two entry points at the repo root, replacing the old `deploy-bitcoin-node.sh`:
   - `bitstack sparrow [local|onion]` -- install Sparrow (host GUI wallet)
     into `/opt/sparrow` if not already present, verifying the release
     tarball via GPG signature + SHA256 manifest (idempotent -- skipped once
-    already installed), then launch it, patching `~/.sparrow/config`'s
-    server fields (via `jq`) to point at either the local electrs
-    (`tcp://127.0.0.1:50001`) or the onion endpoint. With no argument,
-    auto-detects by checking whether something is listening on
+    already installed, seeding `~/.sparrow/config` from `sparrow-config.json`
+    on that first install only), then launch it, patching
+    `~/.sparrow/config`'s server fields (via `jq`) to point at either the
+    local electrs (`tcp://127.0.0.1:50001`) or the onion endpoint. With no
+    argument, auto-detects by checking whether something is listening on
     `127.0.0.1:50001` -- local when electrs is co-resident with the caller,
     onion otherwise. Onion connections need no manual proxy setup: Sparrow
     starts its own bundled Tor client when the server URL is a `.onion`
-    address.
+    address. Also patches `theme` on every launch to match the desktop's
+    light/dark setting (`bitstack_detect_os_theme`: GNOME's `color-scheme`
+    gsetting, falling back to checking `gtk-theme` for "dark"; left
+    untouched if neither is available) -- Sparrow's own `Theme` enum is a
+    fixed `LIGHT`/`DARK` choice with no OS-following of its own.
+
+  `sparrow-config.json` seeds `~/.sparrow/config` on first install with
+  `hideAmounts: true`, `bitcoinUnit: SATOSHIS`, `exchangeSource: NONE`,
+  `feeRatesSource: ELECTRUM_SERVER` (fee estimates from the connected
+  node's own mempool/recent-blocks view, not a third-party API), and
+  `blockExplorer: http://none` (Sparrow's own sentinel URL for "disabled",
+  per its `BlockExplorer.NONE` enum value) -- verified against Sparrow
+  2.5.3's actual source (`io.Config`, `net.{BlockExplorer,ExchangeSource,
+  FeeRatesSource}`, `drongo.BitcoinUnit`), the version `BITSTACK_SPARROW_
+  FALLBACK` currently matches. `theme` is deliberately left out of this
+  seed file -- runtime detection on every launch (above) is the sole
+  source of truth for it.
 
 Terminal help: `bitstack help`, `bitstack <command> help`, or
 `bitstack help <command>` -- see `docs/help/bitstack*.txt`.

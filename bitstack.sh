@@ -463,6 +463,49 @@ bitstack_write_sparrow_server() {
   mv "${tmp}" "${cfg}"
 }
 
+# Best-effort desktop dark/light mode detection so 'bitstack sparrow' can
+# match Sparrow's theme to the OS setting on every launch -- Sparrow itself
+# has no such detection (its Theme is a fixed LIGHT/DARK choice with no
+# system-following code anywhere in its source). Prints LIGHT or DARK and
+# returns 0, or returns 1 with no output if no signal is available; callers
+# should leave the 'theme' config key untouched in that case rather than
+# guess. GNOME 42+'s color-scheme key is authoritative when present; older
+# GNOME/Ubuntu (including this host) only exposes it via the gtk-theme name
+# (e.g. "Yaru-dark").
+bitstack_detect_os_theme() {
+  command -v gsettings >/dev/null 2>&1 || return 1
+
+  local scheme
+  scheme="$(gsettings get org.gnome.desktop.interface color-scheme 2>/dev/null)" || scheme=""
+  case "$scheme" in
+    *prefer-dark*) printf 'DARK\n'; return 0 ;;
+    *prefer-light*|*'default'*) printf 'LIGHT\n'; return 0 ;;
+  esac
+
+  local gtk_theme
+  gtk_theme="$(gsettings get org.gnome.desktop.interface gtk-theme 2>/dev/null)" || gtk_theme=""
+  [[ -n "$gtk_theme" ]] || return 1
+  if [[ "${gtk_theme,,}" == *dark* ]]; then
+    printf 'DARK\n'
+  else
+    printf 'LIGHT\n'
+  fi
+}
+
+# Idempotently patches ~/.sparrow/config's 'theme' key, preserving every
+# other Sparrow preference already in that file. No-op (leaves any existing
+# theme alone) if the config doesn't exist yet -- bitstack_ensure_sparrow_
+# installed always creates one before this runs, so that's only reachable
+# if jq itself is missing, which cmd_sparrow already guards against.
+bitstack_write_sparrow_theme() {
+  local theme="$1" cfg tmp
+  cfg="${BITSTACK_NODE_HOME}/.sparrow/config"
+  [[ -f "${cfg}" ]] || return 0
+  tmp="$(mktemp)"
+  jq --arg theme "${theme}" '.theme=$theme' "${cfg}" > "${tmp}"
+  mv "${tmp}" "${cfg}"
+}
+
 # Installs Sparrow (host GUI wallet) into BITSTACK_SPARROW_DIR, verifying the
 # release tarball via craigraw's GPG signature over the release manifest and
 # the manifest's SHA256 hash, then wires up a desktop launcher and a
@@ -567,6 +610,12 @@ cmd_sparrow() {
   fi
 
   bitstack_write_sparrow_server "${electrum_url}"
+
+  local os_theme
+  if os_theme="$(bitstack_detect_os_theme)"; then
+    bitstack_write_sparrow_theme "${os_theme}"
+  fi
+
   info "Launching Sparrow (${target}: ${electrum_url})"
   exec "${BITSTACK_SPARROW_DIR}/bin/Sparrow"
 }
