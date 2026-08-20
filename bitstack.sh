@@ -51,6 +51,7 @@ help_down()   { cat_help bitstack-down.txt; }
 help_restart() { cat_help bitstack-restart.txt; }
 help_reset()  { cat_help bitstack-reset.txt; }
 help_bitcoin_cli() { cat_help bitstack-bitcoin-cli.txt; }
+help_bitcoind() { cat_help bitstack-bitcoind.txt; }
 help_electrs() { cat_help bitstack-electrs.txt; }
 help_get_onion() { cat_help bitstack-get-onion.txt; }
 help_sparrow() { cat_help bitstack-sparrow.txt; }
@@ -63,6 +64,7 @@ bitstack_help_topic() {
     restart) help_restart ;;
     reset) help_reset ;;
     bitcoin-cli) help_bitcoin_cli ;;
+    bitcoind) help_bitcoind ;;
     electrs) help_electrs ;;
     get-onion) help_get_onion ;;
     sparrow) help_sparrow ;;
@@ -288,6 +290,51 @@ cmd_bitcoin_cli() {
   return "${status}"
 }
 
+# Prints (or, with -f/--follow, streams) '<service>'s docker service logs --
+# shared by 'bitstack bitcoind logs' and 'bitstack electrs logs'.
+bitstack_service_logs() {
+  local service="$1" follow="$2"
+  bitstack_stack_exists || err "Stack '${BITSTACK_STACK_NAME}' is not running -- run 'bitstack up' first."
+  if (( follow )); then
+    docker service logs -f "${BITSTACK_STACK_NAME}_${service}"
+  else
+    docker service logs "${BITSTACK_STACK_NAME}_${service}"
+  fi
+}
+
+cmd_bitcoind_logs() {
+  local follow=0
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      help|-h|--help) help_bitcoind; return 0 ;;
+      -f|--follow) follow=1; shift ;;
+      *) err "bitstack bitcoind logs: unexpected argument: $1 (see: bitstack bitcoind help)" ;;
+    esac
+  done
+
+  bitstack_require_node_user
+  bitstack_service_logs bitcoind "${follow}"
+}
+
+cmd_bitcoind_config() {
+  help_requested "${1:-}" && { help_bitcoind; return 0; }
+  (( $# == 0 )) || err "bitstack bitcoind config: unexpected argument: $1 (see: bitstack bitcoind help)"
+
+  bitstack_require_node_user
+  [[ -f "${BITSTACK_BITCOIN_DIR}/bitcoin.conf" ]] \
+    || err "No bitcoin.conf found at ${BITSTACK_BITCOIN_DIR}/bitcoin.conf -- run 'bitstack up' first."
+  cat "${BITSTACK_BITCOIN_DIR}/bitcoin.conf"
+}
+
+cmd_bitcoind() {
+  case "${1:-}" in
+    ""|help|-h|--help) help_bitcoind; return 0 ;;
+    logs)   shift; cmd_bitcoind_logs "$@" ;;
+    config) shift; cmd_bitcoind_config "$@" ;;
+    *) err "bitstack bitcoind: unknown subcommand: $1 (see: bitstack bitcoind help)" ;;
+  esac
+}
+
 # Common precondition for 'bitstack electrs rotate'/'set key': the stack
 # must be running, and specifically the tor image their helper container
 # reuses to touch the hidden-service volume must already exist locally.
@@ -413,11 +460,26 @@ cmd_electrs_set() {
   bitstack_electrs_rekey bitstack_electrs_write_key "$1"
 }
 
+cmd_electrs_logs() {
+  local follow=0
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      help|-h|--help) help_electrs; return 0 ;;
+      -f|--follow) follow=1; shift ;;
+      *) err "bitstack electrs logs: unexpected argument: $1 (see: bitstack electrs help)" ;;
+    esac
+  done
+
+  bitstack_require_node_user
+  bitstack_service_logs electrs "${follow}"
+}
+
 cmd_electrs() {
   case "${1:-}" in
     ""|help|-h|--help) help_electrs; return 0 ;;
     rotate) shift; cmd_electrs_rotate "$@" ;;
     set)    shift; cmd_electrs_set "$@" ;;
+    logs)   shift; cmd_electrs_logs "$@" ;;
     *) err "bitstack electrs: unknown subcommand: $1 (see: bitstack electrs help)" ;;
   esac
 }
@@ -652,6 +714,7 @@ main() {
     restart) shift; cmd_restart "$@" ;;
     reset) shift; cmd_reset "$@" ;;
     bitcoin-cli) shift; cmd_bitcoin_cli "$@" ;;
+    bitcoind) shift; cmd_bitcoind "$@" ;;
     electrs) shift; cmd_electrs "$@" ;;
     get-onion) shift; cmd_get_onion "$@" ;;
     sparrow) shift; cmd_sparrow "$@" ;;

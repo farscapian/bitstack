@@ -13,7 +13,8 @@ Commands:
   restart             stop then redeploy the stack (down + up)
   reset               stop the stack and DELETE all node data (~/.bitcoin/*)
   bitcoin-cli         run bitcoin-cli against the running bitcoind container
-  electrs             rotate the onion address, or set a specific private key
+  bitcoind            tail bitcoind's logs, or print its bitcoin.conf
+  electrs             tail electrs' logs, rotate the onion address, or set a specific private key
   get-onion           print the onion address publishing electrs' Electrum RPC
   sparrow             install (first run) and launch Sparrow (local if co-resident, else onion)
 
@@ -31,5 +32,6 @@ First-time setup (docker, docker group membership): ./setup.sh --
 
 See also: docs/help/bitstack-up.txt, docs/help/bitstack-down.txt,
 docs/help/bitstack-restart.txt, docs/help/bitstack-reset.txt,
-docs/help/bitstack-bitcoin-cli.txt, docs/help/bitstack-electrs.txt,
-docs/help/bitstack-get-onion.txt, docs/help/bitstack-sparrow.txt
+docs/help/bitstack-bitcoin-cli.txt, docs/help/bitstack-bitcoind.txt,
+docs/help/bitstack-electrs.txt, docs/help/bitstack-get-onion.txt,
+docs/help/bitstack-sparrow.txt

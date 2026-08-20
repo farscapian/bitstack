@@ -1,0 +1,28 @@
+bitstack bitcoind -- inspect the running bitcoind service
+
+Usage:
+  bitstack bitcoind logs [-f|--follow]
+  bitstack bitcoind config
+
+With no subcommand, prints this help.
+
+What it does:
+  logs [-f|--follow]
+    Prints the bitcoind service's docker logs. With -f/--follow, streams
+    them continuously (like 'docker service logs -f') instead of printing
+    the current buffer and exiting. Requires the stack to be running
+    ('bitstack up' first).
+
+  config
+    Prints the bitcoin.conf the running node was deployed with, from
+    ~/.bitcoin/bitcoin.conf on the host (bind-mounted into the bitcoind
+    container). Requires 'bitstack up' to have run at least once -- it
+    installs the default bitcoin.conf on first deploy if one isn't already
+    there.
+
+Help:
+  bitstack bitcoind help
+  bitstack help bitcoind
+
+See also: docs/help/bitstack-bitcoin-cli.txt, docs/help/bitstack-electrs.txt,
+docs/help/bitstack-up.txt

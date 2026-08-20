@@ -63,8 +63,15 @@ Two entry points at the repo root, replacing the old `deploy-bitcoin-node.sh`:
     hash, etc. all aren't valid JSON on their own). stderr (RPC errors,
     connection failures) is never touched, and bitcoin-cli's own exit code
     is preserved.
+  - `bitstack bitcoind logs [-f|--follow]` -- print (or, with `-f`, stream)
+    the `bitcoind` service's docker logs (`docker service logs`).
+  - `bitstack bitcoind config` -- print `~/.bitcoin/bitcoin.conf`, the
+    config the running node was deployed with (bind-mounted into the
+    bitcoind container, so this just `cat`s the host copy).
   - `bitstack electrs` -- with no further subcommand, prints
     `bitstack help electrs`.
+  - `bitstack electrs logs [-f|--follow]` -- same as `bitstack bitcoind
+    logs`, for the `electrs` service.
   - `bitstack get-onion` -- print the onion address publishing electrs'
     Electrum RPC port (50001), querying the running `tor` service and
     caching it to `.bitstack-onion` (gitignored, machine-local) for

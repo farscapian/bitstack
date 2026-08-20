@@ -4,11 +4,16 @@ Usage:
   bitstack electrs
   bitstack electrs rotate [-f|--force]
   bitstack electrs set key <private_key>
+  bitstack electrs logs [-f|--follow]
 
 With no subcommand, prints this help. To print the current onion address
 instead of changing it, see 'bitstack get-onion help'.
 
 What it does:
+  logs [-f|--follow]
+    Prints the electrs service's docker logs. With -f/--follow, streams
+    them continuously instead of printing the current buffer and exiting.
+
   rotate
     Discards the current onion address and lets Tor generate a brand-new
     one. Irreversible -- the old address stops resolving the moment its
