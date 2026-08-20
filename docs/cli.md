@@ -3,27 +3,41 @@
 Two entry points at the repo root, replacing the old `deploy-bitcoin-node.sh`:
 
 - **`./setup.sh`** -- one-time (re-runnable) dependency install: apt prereqs
-  (including `jq`, used to patch Sparrow's config), docker-ce, single-node
-  swarm. Does NOT build any docker images -- that is `bitstack up`'s job --
-  and does NOT install Sparrow -- that is `bitstack sparrow`'s job, on its
-  own first run. Not a subcommand CLI -- just run it directly. Also symlinks
-  `bitstack.sh` to `/usr/local/bin/bitstack` (`sudo ln -sf`) so the bare
-  `bitstack` command below works from anywhere; idempotent, and always
-  resolves to the sibling `bitstack.sh` next to `setup.sh` (the canonical
-  local repo, when the human runs it). Adds the invoking user to the
-  `docker` group if not already a member (checked independently of
-  install, so a re-run still catches it); `bitstack.sh` itself always runs
-  `docker` via `sudo` so this isn't required for bitstack to work, but a
-  membership just added is stale in the current login session (the kernel
+  (including `jq`, used to patch Sparrow's config), docker-ce. Does NOT
+  build any docker images -- that is `bitstack up`'s job -- does NOT
+  initialize the docker swarm -- that is also `bitstack.sh`'s job, on every
+  invocation (see below) -- and does NOT install Sparrow -- that is
+  `bitstack sparrow`'s job, on its own first run. Not a subcommand CLI --
+  just run it directly. Also symlinks `bitstack.sh` to
+  `/usr/local/bin/bitstack` (`sudo ln -sf`) so the bare `bitstack` command
+  below works from anywhere; idempotent, and always resolves to the sibling
+  `bitstack.sh` next to `setup.sh` (the canonical local repo, when the human
+  runs it). Adds the invoking user to the `docker` group if not already a
+  member (checked independently of install, so a re-run still catches it) --
+  a membership just added is stale in the current login session (the kernel
   reads groups at login) -- setup.sh warns and tells the human to log out
-  and back in, or run `newgrp docker`, before using bare `docker` commands.
+  and back in, or run `newgrp docker`, before using `docker` or `bitstack`
+  commands.
 
 - **`bitstack.sh`** (bare command: `bitstack`, wired up by `./setup.sh`) --
   runtime control of the docker-swarm stack, built to
   [.agentstack/docs/cli-conventions.md](../.agentstack/docs/cli-conventions.md)
   (single entrypoint + subcommand dispatch, external help files, tagged
   output via `.agentstack/scripts/lib/cli-log.sh`, the shared `cli-preamble.sh`
-  provenance hook). Commands:
+  provenance hook). Every `docker` call in this codebase runs bare, no
+  `sudo` -- **agents and contributors should assume the invoking user is
+  always an active member of the `docker` group**, the same assumption
+  `setup.sh` establishes (see above). `main()` enforces this itself, near
+  the top, before dispatching to any subcommand: `bitstack_require_docker_group`
+  (in `scripts/bitstack-common.sh`) checks `id -nG` and fails with a
+  copy-paste fix (`newgrp docker`, or log out and back in) if the invoking
+  process isn't an active member, rather than letting a bare `docker` call
+  fail confusingly deeper in some subcommand. Immediately after that check,
+  `main()` also initializes the single-node swarm `docker stack deploy`
+  needs (`bitstack_swarm_active`; `docker swarm init`) if it isn't already
+  running -- idempotent, so it costs nothing on every later invocation, and
+  keeps `setup.sh` a true one-shot install step instead of needing a second,
+  docker-group-active login session to finish this itself. Commands:
   - `bitstack up` -- builds the `local/bitcoind`, `local/electrs`, and
     `local/tor` images (bitcoind/electrs GPG+SHA256 verified; tor is
     Debian's apt package), tagged by resolved version, skipping the build

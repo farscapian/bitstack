@@ -1,7 +1,9 @@
 bitstack up -- deploy the bitcoind + electrs stack
 
-Requires ./setup.sh to have run at least once (docker installed, swarm
-active).
+Requires ./setup.sh to have run at least once (docker installed, and this
+user an active member of the docker group). Every 'bitstack' command,
+including this one, initializes the single-node docker swarm itself first
+if it isn't already active -- no separate step needed.
 
 Usage:
   bitstack up
@@ -16,7 +18,7 @@ What it does:
   4. Waits (up to a minute) for the tor service to publish its hidden
      service and prints the resulting onion address -- electrs' Electrum
      RPC port (50001), reachable over Tor without opening any firewall
-     ports. See: docs/help/bitstack-electrs.txt
+     ports. See: docs/help/bitstack-get-onion.txt
 
 Safe to re-run: 'docker stack deploy' converges the stack to match
 btc-stack.yml without discarding existing data (including the onion
@@ -28,4 +30,5 @@ Help:
 
 See also: docs/help/bitstack-down.txt, docs/help/bitstack-restart.txt,
 docs/help/bitstack-reset.txt, docs/help/bitstack-bitcoin-cli.txt,
-docs/help/bitstack-electrs.txt, docs/help/bitstack-sparrow.txt
+docs/help/bitstack-electrs.txt, docs/help/bitstack-get-onion.txt,
+docs/help/bitstack-sparrow.txt

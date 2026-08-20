@@ -1,8 +1,10 @@
 bitstack -- control the bitcoind + electrs docker-swarm stack
 
-Run from the bitstack repo root, as your regular login user (not root).
-Requires ./setup.sh to have installed docker first. 'bitstack up' builds
-the local/bitcoind, local/electrs, and local/tor images itself.
+Run from the bitstack repo root, as your regular login user (not root), an
+active member of the docker group. Requires ./setup.sh to have installed
+docker first -- every 'bitstack' command then initializes the docker swarm
+itself if needed, before doing anything else. 'bitstack up' builds the
+local/bitcoind, local/electrs, and local/tor images itself.
 
 Commands:
 
@@ -24,8 +26,8 @@ Global Options (valid anywhere on the command line):
   --timestamp         Prefix each line with ISO datetime
   --log-id=ID         Mirror output to ~/.agentstack/logs/bitstack-<ID>.log
 
-First-time setup (docker, swarm): ./setup.sh -- 'bitstack sparrow' installs
-the Sparrow wallet itself, on its own first run.
+First-time setup (docker, docker group membership): ./setup.sh --
+'bitstack sparrow' installs the Sparrow wallet itself, on its own first run.
 
 See also: docs/help/bitstack-up.txt, docs/help/bitstack-down.txt,
 docs/help/bitstack-restart.txt, docs/help/bitstack-reset.txt,

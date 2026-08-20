@@ -6,14 +6,17 @@
 #
 #   1) apt prerequisites
 #   2) symlink bitstack.sh to /usr/local/bin/bitstack (bare 'bitstack' command)
-#   3) docker-ce + single-node swarm (post-install step 'docker stack deploy' needs)
+#   3) docker-ce, and adds the invoking user to the docker group if needed
 #
 # Building the local/bitcoind, local/electrs, and local/tor images
 # (GPG+SHA256 verified Bitcoin Core source) is 'bitstack up's job, not this
 # script's -- it builds each on first run and skips the build on later runs
 # once the tagged image already exists. Installing Sparrow (host GUI wallet,
 # reading sparrow-config.json from its own directory) is 'bitstack sparrow's
-# job, likewise on first run only.
+# job, likewise on first run only. Initializing the single-node swarm
+# ('docker stack deploy' needs one) is bitstack.sh's job too, on every
+# invocation (idempotent) -- see bitstack.sh's own header comment for why
+# that isn't done here.
 #
 # Run as your regular login user (needs sudo). Not root. Deploying/stopping/resetting the
 # stack itself is bitstack.sh's job (bitstack up / down / reset) -- this script
@@ -76,22 +79,17 @@ https://download.docker.com/linux/ubuntu $(. /etc/os-release && echo "${UBUNTU_C
 
   # Group membership is checked independently of install (docker may already
   # be present -- e.g. a re-run, or installed by someone else -- while the
-  # invoking user still isn't in the group). bitstack.sh always runs docker
-  # via sudo itself, so this isn't required for bitstack to work, but a
-  # membership added just now is stale in THIS login session (the kernel
-  # only reads group membership at login), so tell the human explicitly
-  # rather than leaving a silent trap for their next bare 'docker' command.
+  # invoking user still isn't in the group). bitstack.sh runs docker bare, no
+  # sudo (see bitstack_require_docker_group), so this IS required for
+  # bitstack to work -- but a membership added just now is stale in THIS
+  # login session (the kernel only reads group membership at login), so tell
+  # the human explicitly rather than leaving a silent trap for their first
+  # 'bitstack' command.
   local docker_group_added=0
   if ! id -nG "${BITSTACK_NODE_USER}" | grep -qw docker; then
     info "Adding ${BITSTACK_NODE_USER} to the docker group"
     sudo usermod -aG docker "${BITSTACK_NODE_USER}"
     docker_group_added=1
-  fi
-
-  # single-node swarm (required for 'docker stack deploy', used by 'bitstack up')
-  if ! bitstack_swarm_active; then
-    info "Initializing swarm"
-    sudo docker swarm init >/dev/null 2>&1 || sudo docker swarm init --advertise-addr 127.0.0.1 >/dev/null
   fi
 
   ok "Setup complete."
@@ -104,7 +102,7 @@ INFO
 
   if (( docker_group_added )); then
     warn "Added ${BITSTACK_NODE_USER} to the docker group -- this login session doesn't see it yet."
-    warn "Log out and log back in, or run 'newgrp docker', before using bare 'docker' commands."
+    warn "Log out and log back in, or run 'newgrp docker', before using 'docker' or 'bitstack' commands."
   fi
 }
 

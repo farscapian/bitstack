@@ -3,12 +3,16 @@
 #
 # Commands: up / down / reset. See docs/help/bitstack.txt (or run 'bitstack'
 # with no arguments) for the command catalog. First-time dependency install
-# (docker, swarm) is ./setup.sh, not this script. 'bitstack up' builds the
+# (docker itself, plus adding this user to the docker group) is ./setup.sh,
+# not this script -- but initializing the single-node swarm is main()'s job
+# here, on every invocation (idempotent), so setup.sh doesn't need a second
+# docker-group-active login session just to do it. 'bitstack up' builds the
 # local/bitcoind, local/electrs, and local/tor images itself, tagged by
 # version, and skips the build once a tag already exists. 'bitstack sparrow'
 # installs Sparrow (host GUI wallet) itself, on first run.
 #
-# Run as your regular login user (needs sudo). Not root.
+# Run as your regular login user, an active member of the docker group
+# (see ./setup.sh) -- not root, and no sudo needed for docker itself.
 
 set -euo pipefail
 
@@ -75,8 +79,6 @@ cmd_up() {
   bitstack_require_node_user
   bitstack_require_siblings "${SCRIPT_DIR}"
 
-  bitstack_swarm_active || err "Docker swarm is not active -- run ./setup.sh first."
-
   local node_uid node_gid
   node_uid="$(id -u "${BITSTACK_NODE_USER}")"
   node_gid="$(id -g "${BITSTACK_NODE_USER}")"
@@ -88,21 +90,21 @@ cmd_up() {
   tor_version="${BITSTACK_TOR_IMAGE_VERSION}"
 
   bitstack_ensure_image "local/bitcoind:${bitcoin_version}" \
-    sudo docker build \
+    docker build \
       --build-arg BITCOIN_VERSION="${bitcoin_version}" \
       --build-arg UID="${node_uid}" --build-arg GID="${node_gid}" \
       -t "local/bitcoind:${bitcoin_version}" \
       -f "${SCRIPT_DIR}/bitcoind.Dockerfile" "${SCRIPT_DIR}"
 
   bitstack_ensure_image "local/electrs:${electrs_version}" \
-    sudo docker build \
+    docker build \
       --build-arg ELECTRS_VERSION="${electrs_version}" \
       --build-arg UID="${node_uid}" --build-arg GID="${node_gid}" \
       -t "local/electrs:${electrs_version}" \
       -f "${SCRIPT_DIR}/electrs.Dockerfile" "${SCRIPT_DIR}"
 
   bitstack_ensure_image "local/tor:${tor_version}" \
-    sudo docker build \
+    docker build \
       -t "local/tor:${tor_version}" \
       -f "${SCRIPT_DIR}/tor.Dockerfile" "${SCRIPT_DIR}"
 
@@ -115,8 +117,7 @@ cmd_up() {
   fi
 
   info "Deploying stack '${BITSTACK_STACK_NAME}' (bitcoind ${bitcoin_version}, electrs ${electrs_version})"
-  sudo env \
-    BITCOIN_VERSION="${bitcoin_version}" \
+  BITCOIN_VERSION="${bitcoin_version}" \
     ELECTRS_VERSION="${electrs_version}" \
     TOR_VERSION="${tor_version}" \
     BITCOIN_DIR="${BITSTACK_BITCOIN_DIR}" \
@@ -131,16 +132,16 @@ cmd_up() {
     printf '%s\n' "${onion_host}" > "${BITSTACK_ONION_FILE}"
     onion_line="tcp://${onion_host}:50001"
   else
-    warn "Tor hidden service not ready yet -- check: sudo docker service logs -f ${BITSTACK_STACK_NAME}_tor"
+    warn "Tor hidden service not ready yet -- check: docker service logs -f ${BITSTACK_STACK_NAME}_tor"
     onion_line="pending -- run 'bitstack get-onion' once the tor service is up"
   fi
 
   cat <<INFO
 
-Stack:    sudo docker stack services ${BITSTACK_STACK_NAME}
-Logs:     sudo docker service logs -f ${BITSTACK_STACK_NAME}_bitcoind
-          sudo docker service logs -f ${BITSTACK_STACK_NAME}_electrs
-          sudo docker service logs -f ${BITSTACK_STACK_NAME}_tor
+Stack:    docker stack services ${BITSTACK_STACK_NAME}
+Logs:     docker service logs -f ${BITSTACK_STACK_NAME}_bitcoind
+          docker service logs -f ${BITSTACK_STACK_NAME}_electrs
+          docker service logs -f ${BITSTACK_STACK_NAME}_tor
 Electrum: tcp://127.0.0.1:50001  (Private Electrum, SSL off)
 Onion:    ${onion_line}
 Wallet:   bitstack sparrow   (installs Sparrow on first run; auto: local when co-resident with electrs, else onion)
@@ -155,14 +156,14 @@ bitstack_do_down() {
     return 0
   fi
   info "Stopping stack '${BITSTACK_STACK_NAME}'"
-  sudo docker stack rm "${BITSTACK_STACK_NAME}"
+  docker stack rm "${BITSTACK_STACK_NAME}"
   bitstack_wait_stack_gone 120 \
-    || warn "Timed out waiting for '${BITSTACK_STACK_NAME}' services to fully terminate; check: sudo docker service ls"
+    || warn "Timed out waiting for '${BITSTACK_STACK_NAME}' services to fully terminate; check: docker service ls"
   # Network teardown lags service removal -- redeploying (e.g. 'bitstack
   # restart') before it finishes can race 'docker stack deploy' and fail
   # with "network ... not found" (see bitstack_wait_network_gone).
   bitstack_wait_network_gone 60 \
-    || warn "Timed out waiting for the '${BITSTACK_STACK_NAME}_btc' network to fully terminate; check: sudo docker network ls"
+    || warn "Timed out waiting for the '${BITSTACK_STACK_NAME}_btc' network to fully terminate; check: docker network ls"
 }
 
 cmd_down() {
@@ -227,9 +228,9 @@ cmd_reset() {
   bitstack_require_node_user
   bitstack_do_down
 
-  if sudo docker volume inspect "${BITSTACK_STACK_NAME}_electrs-db" >/dev/null 2>&1; then
+  if docker volume inspect "${BITSTACK_STACK_NAME}_electrs-db" >/dev/null 2>&1; then
     info "Removing electrs database volume"
-    sudo docker volume rm "${BITSTACK_STACK_NAME}_electrs-db" >/dev/null 2>&1 || true
+    docker volume rm "${BITSTACK_STACK_NAME}_electrs-db" >/dev/null 2>&1 || true
   fi
 
   if [[ ! -d "${BITSTACK_BITCOIN_DIR}" ]] || [[ -z "$(ls -A "${BITSTACK_BITCOIN_DIR}" 2>/dev/null)" ]]; then
@@ -269,10 +270,10 @@ cmd_bitcoin_cli() {
   local container
   container="$(bitstack_bitcoind_container)"
   [[ -n "$container" ]] \
-    || err "bitcoind container not found (stack up but service not ready?) -- check: sudo docker service ps ${BITSTACK_STACK_NAME}_bitcoind"
+    || err "bitcoind container not found (stack up but service not ready?) -- check: docker service ps ${BITSTACK_STACK_NAME}_bitcoind"
 
   local out status
-  if out="$(sudo docker exec -i "$container" bitcoin-cli -datadir="${BITSTACK_BITCOIN_DIR}" "$@")"; then
+  if out="$(docker exec -i "$container" bitcoin-cli -datadir="${BITSTACK_BITCOIN_DIR}" "$@")"; then
     status=0
   else
     status=$?
@@ -302,7 +303,7 @@ bitstack_electrs_require_stack() {
 # replicas (see bitstack_electrs_rekey) -- it isn't safe to yank key
 # material out from under a running Tor.
 bitstack_electrs_wipe_hs() {
-  sudo docker run --rm --entrypoint sh \
+  docker run --rm --entrypoint sh \
     -v "${BITSTACK_STACK_NAME}_tor-hidden-service:/hs" \
     "local/tor:${BITSTACK_TOR_IMAGE_VERSION}" \
     -c 'find /hs -mindepth 1 -delete'
@@ -337,7 +338,7 @@ bitstack_electrs_write_key() {
   (( size == 96 )) \
     || err "bitstack electrs set key: expected a 64-byte private key, got $((size - 32)) bytes after base64 decoding -- pass the ED25519-V3:<base64> form of a Tor v3 onion service private key"
 
-  sudo docker run --rm --entrypoint sh \
+  docker run --rm --entrypoint sh \
     -v "${BITSTACK_STACK_NAME}_tor-hidden-service:/hs" \
     -v "${tmp}:/src:ro" \
     "local/tor:${BITSTACK_TOR_IMAGE_VERSION}" \
@@ -355,14 +356,14 @@ bitstack_electrs_rekey() {
   local mutator="$1"; shift
 
   info "Stopping tor service"
-  sudo docker service scale "${BITSTACK_STACK_NAME}_tor=0" >/dev/null
+  docker service scale "${BITSTACK_STACK_NAME}_tor=0" >/dev/null
   bitstack_wait_service_idle "${BITSTACK_STACK_NAME}_tor" 60 \
-    || err "Timed out waiting for the tor service to stop -- check: sudo docker service ps ${BITSTACK_STACK_NAME}_tor"
+    || err "Timed out waiting for the tor service to stop -- check: docker service ps ${BITSTACK_STACK_NAME}_tor"
 
   "$mutator" "$@"
 
   info "Restarting tor service"
-  sudo docker service scale "${BITSTACK_STACK_NAME}_tor=1" >/dev/null
+  docker service scale "${BITSTACK_STACK_NAME}_tor=1" >/dev/null
 
   info "Waiting for the new onion address to publish (can take up to a minute)"
   local onion_host
@@ -370,7 +371,7 @@ bitstack_electrs_rekey() {
     printf '%s\n' "${onion_host}" > "${BITSTACK_ONION_FILE}"
     ok "New onion address: tcp://${onion_host}:50001"
   else
-    warn "Tor hidden service not ready yet -- check: sudo docker service logs -f ${BITSTACK_STACK_NAME}_tor"
+    warn "Tor hidden service not ready yet -- check: docker service logs -f ${BITSTACK_STACK_NAME}_tor"
   fi
 }
 
@@ -625,6 +626,18 @@ main() {
   local argv=()
   _as_cli_parse_global_flags argv "$@"
   set -- "${argv[@]}"
+
+  bitstack_require_docker_group
+
+  # Single-node swarm is required for 'docker stack deploy' ('bitstack up').
+  # Idempotent and cheap to check, so just done unconditionally here rather
+  # than making every command that eventually needs it re-check -- lets
+  # ./setup.sh stay a one-shot install step instead of needing a second,
+  # docker-group-active login session to finish this itself.
+  bitstack_swarm_active || {
+    info "Initializing docker swarm"
+    docker swarm init >/dev/null 2>&1 || docker swarm init --advertise-addr 127.0.0.1 >/dev/null
+  }
 
   eval "$(AGENTSTACK_CLI_TOOL=bitstack "${BITSTACK_ROOT}/.agentstack/scripts/cli-preamble.sh" "${BITSTACK_ROOT}")"
   debug "provenance HEAD=${AGENTSTACK_CLI_HEAD:-unknown}"

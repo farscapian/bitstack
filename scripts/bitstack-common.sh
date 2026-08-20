@@ -32,16 +32,30 @@ BITSTACK_TOR_IMAGE_VERSION="2"
 
 BITSTACK_SIBLINGS=(bitcoind.Dockerfile electrs.Dockerfile tor.Dockerfile torrc tor-entrypoint.sh btc-stack.yml bitcoin.conf sparrow-config.json)
 
-# Fail unless invoked as BITSTACK_NODE_USER (needs sudo for docker/apt, but must
-# not run as root itself -- matches the original deploy-bitcoin-node.sh guard).
-# BITSTACK_NODE_USER defaults to the invoking user; set it explicitly to pin
-# node ownership to a different account.
+# Fail unless invoked as BITSTACK_NODE_USER (setup.sh still needs sudo for
+# apt; docker itself is run bare, see bitstack_require_docker_group), but
+# must not run as root itself -- matches the original deploy-bitcoin-node.sh
+# guard. BITSTACK_NODE_USER defaults to the invoking user; set it explicitly
+# to pin node ownership to a different account.
 bitstack_require_node_user() {
   [[ "${BITSTACK_NODE_USER}" != "root" ]] || {
     err "Run this as a regular user (needs sudo), not as root."
   }
   [[ "$(id -un)" == "${BITSTACK_NODE_USER}" ]] || {
     err "Run this as ${BITSTACK_NODE_USER} (needs sudo), not as $(id -un)."
+  }
+}
+
+# Fail with a copy-paste fix unless the current process actively belongs to
+# the docker group -- every docker call in this codebase runs bare (no
+# sudo), which needs it. Checked via 'id -nG' (the running process's actual
+# group list), not /etc/group, so a membership 'setup.sh' just granted but
+# this login session hasn't picked up yet (the kernel reads group
+# membership at login) is still caught here instead of failing confusingly
+# on the first docker call.
+bitstack_require_docker_group() {
+  id -nG "$(id -un)" | tr ' ' '\n' | grep -qx docker || {
+    err "$(id -un) is not an active member of the docker group -- run 'newgrp docker', or log out and back in, then try again. (Run ./setup.sh first if you haven't.)"
   }
 }
 
@@ -65,11 +79,11 @@ bitstack_latest_tag() {
 }
 
 bitstack_swarm_active() {
-  sudo docker info 2>/dev/null | grep -q 'Swarm: active'
+  docker info 2>/dev/null | grep -q 'Swarm: active'
 }
 
 bitstack_image_present() {
-  sudo docker image inspect "$1" >/dev/null 2>&1
+  docker image inspect "$1" >/dev/null 2>&1
 }
 
 # Build docker image tagged $1 by running the remaining arguments as the
@@ -86,12 +100,12 @@ bitstack_ensure_image() {
 }
 
 bitstack_stack_exists() {
-  sudo docker stack ls --format '{{.Name}}' 2>/dev/null | grep -qx "${BITSTACK_STACK_NAME}"
+  docker stack ls --format '{{.Name}}' 2>/dev/null | grep -qx "${BITSTACK_STACK_NAME}"
 }
 
 # Container ID of the running bitcoind swarm task, or empty if none.
 bitstack_bitcoind_container() {
-  sudo docker ps \
+  docker ps \
     --filter "label=com.docker.swarm.service.name=${BITSTACK_STACK_NAME}_bitcoind" \
     --filter "status=running" \
     --format '{{.ID}}' | head -n1
@@ -99,7 +113,7 @@ bitstack_bitcoind_container() {
 
 # Container ID of the running tor swarm task, or empty if none.
 bitstack_onion_container() {
-  sudo docker ps \
+  docker ps \
     --filter "label=com.docker.swarm.service.name=${BITSTACK_STACK_NAME}_tor" \
     --filter "status=running" \
     --format '{{.ID}}' | head -n1
@@ -111,7 +125,7 @@ bitstack_onion_hostname() {
   local container
   container="$(bitstack_onion_container)"
   [[ -n "$container" ]] || return 1
-  sudo docker exec "$container" cat /var/lib/tor/hidden_service/hostname 2>/dev/null | tr -d '[:space:]'
+  docker exec "$container" cat /var/lib/tor/hidden_service/hostname 2>/dev/null | tr -d '[:space:]'
 }
 
 # Poll for the onion hostname to appear -- first run generates a fresh
@@ -156,7 +170,7 @@ bitstack_electrs_local_reachable() {
 # race a still-terminating container.
 bitstack_wait_stack_gone() {
   local timeout="${1:-120}" waited=0
-  while sudo docker service ls \
+  while docker service ls \
       --filter "label=com.docker.stack.namespace=${BITSTACK_STACK_NAME}" \
       --format '{{.Name}}' 2>/dev/null | grep -q .; do
     ((waited >= timeout)) && return 1
@@ -175,7 +189,7 @@ bitstack_wait_stack_gone() {
 # 'docker stack deploy'.
 bitstack_wait_network_gone() {
   local timeout="${1:-60}" waited=0
-  while sudo docker network inspect "${BITSTACK_STACK_NAME}_btc" >/dev/null 2>&1; do
+  while docker network inspect "${BITSTACK_STACK_NAME}_btc" >/dev/null 2>&1; do
     ((waited >= timeout)) && return 1
     sleep 1
     ((waited += 1))
@@ -188,7 +202,7 @@ bitstack_wait_network_gone() {
 # not race a still-terminating container.
 bitstack_wait_service_idle() {
   local service="$1" timeout="${2:-60}" waited=0
-  while sudo docker service ps "${service}" \
+  while docker service ps "${service}" \
       --filter "desired-state=running" \
       --format '{{.ID}}' 2>/dev/null | grep -q .; do
     ((waited >= timeout)) && return 1
