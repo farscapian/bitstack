@@ -41,16 +41,19 @@ Two entry points at the repo root, replacing the old `deploy-bitcoin-node.sh`:
   - `bitstack up` -- builds the `local/bitcoind`, `local/electrs`, and
     `local/tor` images (bitcoind/electrs GPG+SHA256 verified; tor is
     Debian's apt package), tagged by resolved version, skipping the build
-    when a tag is already present locally. Then prepares `~/.bitcoin` and
-    deploys the stack (idempotent). Also waits for the `tor` service to
-    publish its hidden service and prints the onion address.
+    when a tag is already present locally. Then prepares `~/.bitcoin`,
+    `~/.bitstack/electrs-db`, and `~/.bitstack/onion` (plain host
+    directories, bind-mounted into the containers -- not docker volumes --
+    so they're as visible/backupable as `~/.bitcoin` is) and deploys the
+    stack (idempotent). Also waits for the `tor` service to publish its
+    hidden service and prints the onion address.
   - `bitstack down` -- stop the stack; node data is left in place
   - `bitstack restart` -- `bitstack down` followed by `bitstack up`
-  - `bitstack reset` -- stop the stack, remove the electrs volume, and DELETE
-    `~/.bitcoin/*`. Requires two interactive confirmations before deleting
-    `blocks/`, `chainstate/`, or `wallets/` (or `-f/--force` to skip, for
-    scripted use). Does NOT remove the Tor hidden-service volume -- the
-    onion address stays stable across resets.
+  - `bitstack reset` -- stop the stack, remove `~/.bitstack/electrs-db`,
+    and DELETE `~/.bitcoin/*`. Requires two interactive confirmations
+    before deleting `blocks/`, `chainstate/`, or `wallets/` (or
+    `-f/--force` to skip, for scripted use). Does NOT remove
+    `~/.bitstack/onion` -- the onion address stays stable across resets.
   - `bitstack bitcoin-cli [args...]` -- run `bitcoin-cli` inside the running
     bitcoind container (`docker exec`, same datadir as the node, so cookie
     auth just works). All arguments are forwarded verbatim to `bitcoin-cli`;
@@ -78,24 +81,25 @@ Two entry points at the repo root, replacing the old `deploy-bitcoin-node.sh`:
     `bitstack sparrow` to read later, including from a host that does not
     run the stack itself.
   - `bitstack electrs rotate [-f|--force]` -- scale the `tor` service to 0,
-    wipe the `tor-hidden-service` volume, scale it back to 1 so Tor
-    generates a brand-new v3 address, then cache the new address like
-    `bitstack up`/`bitstack get-onion` do. Irreversible (the old address
-    stops resolving once its key is gone); prompts for confirmation unless
+    wipe `~/.bitstack/onion`, scale it back to 1 so Tor generates a
+    brand-new v3 address, then cache the new address like `bitstack
+    up`/`bitstack get-onion` do. Irreversible (the old address stops
+    resolving once its key is gone); prompts for confirmation unless
     `-f`/`--force`.
   - `bitstack electrs set key <private_key>` -- same stop/wipe/restart
-    cycle, but writes a specific Tor v3 private key into the volume
-    instead of letting Tor generate one, so the resulting `.onion` address
-    is one already under the caller's control (restoring a prior identity,
-    a vanity address from a tool like `mkp224o`, etc.). Accepts the
-    `ED25519-V3:<base64>` form (Tor's `ADD_ONION` control-command format,
-    also what most vanity-address generators emit) or the bare base64 of
-    the same 64 raw bytes. Only the secret key file is written -- Tor
-    derives the matching public key and `.onion` hostname from it itself
-    on next start, the same code path used for a freshly generated key.
-    `rotate` and `set key` both reuse the already-built `local/tor` image
-    (via `docker run --entrypoint sh ... find/cp`) to touch the volume, so
-    neither needs an extra pull or build.
+    cycle, but writes a specific Tor v3 private key into
+    `~/.bitstack/onion` instead of letting Tor generate one, so the
+    resulting `.onion` address is one already under the caller's control
+    (restoring a prior identity, a vanity address from a tool like
+    `mkp224o`, etc.). Accepts the `ED25519-V3:<base64>` form (Tor's
+    `ADD_ONION` control-command format, also what most vanity-address
+    generators emit) or the bare base64 of the same 64 raw bytes. Only the
+    secret key file is written -- Tor derives the matching public key and
+    `.onion` hostname from it itself on next start, the same code path
+    used for a freshly generated key. `rotate` and `set key` both reuse
+    the already-built `local/tor` image (via `docker run --entrypoint sh
+    ... find/cp`) to touch `~/.bitstack/onion`, so neither needs an extra
+    pull or build.
   - `bitstack sparrow [local|onion]` -- install Sparrow (host GUI wallet)
     into `/opt/sparrow` if not already present, verifying the release
     tarball via GPG signature + SHA256 manifest (idempotent -- skipped once
@@ -105,9 +109,15 @@ Two entry points at the repo root, replacing the old `deploy-bitcoin-node.sh`:
     local electrs (`tcp://127.0.0.1:50001`) or the onion endpoint. With no
     argument, auto-detects by checking whether something is listening on
     `127.0.0.1:50001` -- local when electrs is co-resident with the caller,
-    onion otherwise. Onion connections need no manual proxy setup: Sparrow
-    starts its own bundled Tor client when the server URL is a `.onion`
-    address. Also patches `theme` on every launch to match the desktop's
+    onion otherwise. Whichever target is used -- explicit or auto-detected
+    -- is verified live before the config is touched (`local` via a real
+    TCP probe, `onion` via the running `tor` service or the last cached
+    address); an explicit target that fails its own check errors out
+    immediately rather than silently writing a dead address, and
+    auto-detect errors out too if neither is reachable. Onion connections
+    need no manual proxy setup: Sparrow starts its own bundled Tor client
+    when the server URL is a `.onion` address. Also patches `theme` on
+    every launch to match the desktop's
     light/dark setting (`bitstack_detect_os_theme`: GNOME's `color-scheme`
     gsetting, falling back to checking `gtk-theme` for "dark"; left
     untouched if neither is available) -- Sparrow's own `Theme` enum is a
@@ -139,10 +149,11 @@ The `tor` service in `btc-stack.yml` publishes electrs' Electrum RPC port
 (50001) as a Tor v3 hidden service, so a remote Sparrow can reach the node
 without any firewall port-forwarding. It has no published ports of its own --
 only outbound access to the Tor network plus the `btc` overlay network to
-reach `electrs:50001`. The hidden-service private key lives in the
-`tor-hidden-service` docker volume, keeping the onion address stable across
-`bitstack up`/`down`/`reset`; use `bitstack electrs rotate` or `bitstack
-electrs set key` to change it deliberately (see above).
+reach `electrs:50001`. The hidden-service private key lives in
+`~/.bitstack/onion` on the host (a bind mount, not a docker volume),
+keeping the onion address stable across `bitstack up`/`down`/`reset`; use
+`bitstack electrs rotate` or `bitstack electrs set key` to change it
+deliberately (see above).
 
 `torrc` (`/etc/tor/torrc` in the image) sets `SocksPort 0`: this daemon only
 *publishes* the hidden service, it does not proxy outbound connections for
@@ -152,13 +163,15 @@ configured server is a `.onion` address (see `bitstack sparrow` above), no
 separate `SocksPort`/proxy configuration needed.
 
 `tor-entrypoint.sh` runs as root (no `USER` in `tor.Dockerfile`) and chowns
-`/var/lib/tor` -- including the `tor-hidden-service` volume, root-owned by
-default on first mount -- to `debian-tor` before exec'ing `tor`. Tor fixes
-`DataDirectory` ownership itself when started as root, but treats a
-`HiddenServiceDir` it doesn't already own as a hard security error and
-refuses to fix it, so the docker volume needs that chown done for it on
-every container start.
+`/var/lib/tor` -- including the bind-mounted `~/.bitstack/onion` -- to
+`debian-tor` before exec'ing `tor`. Tor fixes `DataDirectory` ownership
+itself when started as root, but treats a `HiddenServiceDir` it doesn't
+already own as a hard security error and refuses to fix it, so this chown
+runs on every container start regardless of what the host-side directory
+was already owned by.
 
 Both scripts must run as the configured node user (`BITSTACK_NODE_USER`,
-defaults to the invoking user), never as root -- they call `sudo` themselves
-for the privileged steps (apt, docker).
+defaults to the invoking user), never as root. `setup.sh` still calls
+`sudo` for its own privileged steps (apt, docker-ce install, `usermod`);
+`bitstack.sh` runs `docker` bare, no `sudo` -- see the docker-group note
+near the top of this file.

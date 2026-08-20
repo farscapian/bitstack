@@ -12,6 +12,11 @@
 BITSTACK_NODE_USER="${BITSTACK_NODE_USER:-$(id -un)}"
 BITSTACK_NODE_HOME="/home/${BITSTACK_NODE_USER}"
 BITSTACK_BITCOIN_DIR="${BITSTACK_NODE_HOME}/.bitcoin"      # bind-mounted into containers
+# electrs' index and the tor hidden-service key material -- host bind mounts
+# (not docker volumes), so they're visible/backupable like ~/.bitcoin is.
+BITSTACK_DATA_DIR="${BITSTACK_NODE_HOME}/.bitstack"
+BITSTACK_ELECTRS_DB_DIR="${BITSTACK_DATA_DIR}/electrs-db"
+BITSTACK_ONION_DIR="${BITSTACK_DATA_DIR}/onion"
 BITSTACK_STACK_NAME="bitstack"
 BITSTACK_SPARROW_DIR="/opt/sparrow"
 # Last-known onion hostname 'bitstack up'/'bitstack get-onion' queried

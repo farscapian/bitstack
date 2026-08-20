@@ -1,5 +1,6 @@
 # Interpolated at deploy time from the environment:
 #   BITCOIN_VERSION  ELECTRS_VERSION  TOR_VERSION  BITCOIN_DIR
+#   ELECTRS_DB_DIR   ONION_DIR
 services:
   bitcoind:
     image: local/bitcoind:${BITCOIN_VERSION}
@@ -29,7 +30,7 @@ services:
       - --log-filters=INFO
     volumes:
       - ${BITCOIN_DIR}:${BITCOIN_DIR}:ro   # read the .cookie only
-      - electrs-db:/var/lib/electrs
+      - ${ELECTRS_DB_DIR}:/var/lib/electrs
     ports:
       - target: 50001
         published: 50001
@@ -45,9 +46,9 @@ services:
     image: local/tor:${TOR_VERSION}
     # No published ports: this container only publishes the electrs Electrum
     # RPC port as a Tor hidden service (see torrc). Clients reach it with
-    # their own Tor client -- see 'bitstack wallet' / 'bitstack tor'.
+    # their own Tor client -- see 'bitstack sparrow' / 'bitstack get-onion'.
     volumes:
-      - tor-hidden-service:/var/lib/tor/hidden_service
+      - ${ONION_DIR}:/var/lib/tor/hidden_service
     networks: [btc]
     deploy:
       replicas: 1
@@ -58,7 +59,3 @@ networks:
   btc:
     driver: overlay
     attachable: true
-
-volumes:
-  electrs-db:
-  tor-hidden-service:

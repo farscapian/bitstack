@@ -32,18 +32,19 @@ What it does:
     no need to supply those separately.
 
   rotate and set key both stop the 'tor' service, replace the
-  hidden-service key material in the 'tor-hidden-service' docker volume,
-  restart the service, and wait for the (new) onion address to publish --
-  caching it to .bitstack-onion, same as 'bitstack get-onion' does.
-  Node data, electrs, and bitcoind are untouched throughout; only the tor
-  service is bounced.
+  hidden-service key material under ~/.bitstack/onion, restart the
+  service, and wait for the (new) onion address to publish -- caching it
+  to .bitstack-onion, same as 'bitstack get-onion' does. Node data,
+  electrs, and bitcoind are untouched throughout; only the tor service is
+  bounced.
 
-The address is stable across restarts and redeploys (the key lives in a
-docker volume) -- rotate/set key change it deliberately; nothing else does.
+The address is stable across restarts and redeploys (the key lives in
+~/.bitstack/onion on the host) -- rotate/set key change it deliberately;
+nothing else does.
 
 Requires the stack to be running ('bitstack up' first). rotate and set key
-also reuse the already-built local/tor image to touch the volume, so
-neither needs an extra download or build.
+also reuse the already-built local/tor image to touch ~/.bitstack/onion,
+so neither needs an extra download or build.
 
 Help:
   bitstack electrs help

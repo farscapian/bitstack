@@ -73,7 +73,8 @@ bitstack_help_topic() {
 }
 
 # Deploy is idempotent: 'docker stack deploy' converges the running stack to
-# match btc-stack.yml without discarding ~/.bitcoin or the electrs volume.
+# match btc-stack.yml without discarding ~/.bitcoin, ~/.bitstack/electrs-db,
+# or ~/.bitstack/onion.
 cmd_up() {
   help_requested "${1:-}" && { help_up; return 0; }
   (( $# == 0 )) || err "bitstack up: unexpected argument: $1 (see: bitstack up help)"
@@ -118,11 +119,24 @@ cmd_up() {
       "${SCRIPT_DIR}/bitcoin.conf" "${BITSTACK_BITCOIN_DIR}/bitcoin.conf"
   fi
 
+  # Host bind mounts, not docker volumes, for electrs' index and the tor
+  # hidden-service key material -- pre-created and owned by the node user
+  # (matching electrs' in-container UID, set via build args above) so
+  # electrs can write to its bind mount same as it could a fresh volume.
+  # tor's entrypoint re-chowns its own mount to debian-tor on every start
+  # regardless (see tor-entrypoint.sh), so this ownership is only a
+  # starting point for that one, not load-bearing.
+  info "Preparing ${BITSTACK_ELECTRS_DB_DIR} and ${BITSTACK_ONION_DIR}"
+  mkdir -p "${BITSTACK_ELECTRS_DB_DIR}" "${BITSTACK_ONION_DIR}"
+  chown "${node_uid}:${node_gid}" "${BITSTACK_ELECTRS_DB_DIR}" "${BITSTACK_ONION_DIR}"
+
   info "Deploying stack '${BITSTACK_STACK_NAME}' (bitcoind ${bitcoin_version}, electrs ${electrs_version})"
   BITCOIN_VERSION="${bitcoin_version}" \
     ELECTRS_VERSION="${electrs_version}" \
     TOR_VERSION="${tor_version}" \
     BITCOIN_DIR="${BITSTACK_BITCOIN_DIR}" \
+    ELECTRS_DB_DIR="${BITSTACK_ELECTRS_DB_DIR}" \
+    ONION_DIR="${BITSTACK_ONION_DIR}" \
     docker stack deploy --resolve-image never \
     -c "${SCRIPT_DIR}/btc-stack.yml" "${BITSTACK_STACK_NAME}"
 
@@ -230,9 +244,9 @@ cmd_reset() {
   bitstack_require_node_user
   bitstack_do_down
 
-  if docker volume inspect "${BITSTACK_STACK_NAME}_electrs-db" >/dev/null 2>&1; then
-    info "Removing electrs database volume"
-    docker volume rm "${BITSTACK_STACK_NAME}_electrs-db" >/dev/null 2>&1 || true
+  if [[ -d "${BITSTACK_ELECTRS_DB_DIR}" ]]; then
+    info "Removing ${BITSTACK_ELECTRS_DB_DIR}"
+    rm -rf "${BITSTACK_ELECTRS_DB_DIR}"
   fi
 
   if [[ ! -d "${BITSTACK_BITCOIN_DIR}" ]] || [[ -z "$(ls -A "${BITSTACK_BITCOIN_DIR}" 2>/dev/null)" ]]; then
@@ -337,7 +351,7 @@ cmd_bitcoind() {
 
 # Common precondition for 'bitstack electrs rotate'/'set key': the stack
 # must be running, and specifically the tor image their helper container
-# reuses to touch the hidden-service volume must already exist locally.
+# reuses to touch ~/.bitstack/onion must already exist locally.
 bitstack_electrs_require_stack() {
   bitstack_require_node_user
   bitstack_stack_exists || err "Stack '${BITSTACK_STACK_NAME}' is not running -- run 'bitstack up' first."
@@ -345,13 +359,13 @@ bitstack_electrs_require_stack() {
     || err "local/tor:${BITSTACK_TOR_IMAGE_VERSION} image not found -- run 'bitstack up' first."
 }
 
-# Wipes the tor hidden-service volume so Tor generates a brand-new v3
-# onion address on next start. Run only while the tor service has zero
-# replicas (see bitstack_electrs_rekey) -- it isn't safe to yank key
-# material out from under a running Tor.
+# Wipes ~/.bitstack/onion so Tor generates a brand-new v3 onion address on
+# next start. Run only while the tor service has zero replicas (see
+# bitstack_electrs_rekey) -- it isn't safe to yank key material out from
+# under a running Tor.
 bitstack_electrs_wipe_hs() {
   docker run --rm --entrypoint sh \
-    -v "${BITSTACK_STACK_NAME}_tor-hidden-service:/hs" \
+    -v "${BITSTACK_ONION_DIR}:/hs" \
     "local/tor:${BITSTACK_TOR_IMAGE_VERSION}" \
     -c 'find /hs -mindepth 1 -delete'
 }
@@ -386,14 +400,14 @@ bitstack_electrs_write_key() {
     || err "bitstack electrs set key: expected a 64-byte private key, got $((size - 32)) bytes after base64 decoding -- pass the ED25519-V3:<base64> form of a Tor v3 onion service private key"
 
   docker run --rm --entrypoint sh \
-    -v "${BITSTACK_STACK_NAME}_tor-hidden-service:/hs" \
+    -v "${BITSTACK_ONION_DIR}:/hs" \
     -v "${tmp}:/src:ro" \
     "local/tor:${BITSTACK_TOR_IMAGE_VERSION}" \
     -c 'find /hs -mindepth 1 -delete && cp /src/hs_ed25519_secret_key /hs/hs_ed25519_secret_key && chmod 600 /hs/hs_ed25519_secret_key'
 }
 
 # Scales the tor service to 0, waits for it to actually stop (so nothing
-# else has the hidden-service volume open), runs $1 (a bitstack_electrs_*
+# else has ~/.bitstack/onion open), runs $1 (a bitstack_electrs_*
 # mutator, plus any further args) against it, then scales tor back to 1
 # and waits for the (new) onion address, caching it to BITSTACK_ONION_FILE
 # like 'bitstack up'/'bitstack get-onion' do. Shared by 'bitstack electrs

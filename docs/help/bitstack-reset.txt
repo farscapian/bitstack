@@ -6,7 +6,7 @@ Usage:
 
 What it does:
   1. Stops the 'bitstack' stack if it is running (same as 'bitstack down')
-  2. Removes the electrs database docker volume
+  2. Removes ~/.bitstack/electrs-db (the electrs index)
   3. Deletes everything under ~/.bitcoin, INCLUDING blocks/, chainstate/,
      and wallets/ if present
 
@@ -15,7 +15,7 @@ This is destructive. For a fully-validating node it means a full re-sync
 wallet, any funds in it become UNRECOVERABLE.
 
 The Tor hidden-service key (and so the onion address) is untouched -- it
-lives in a separate docker volume that 'bitstack reset' does not remove.
+lives in ~/.bitstack/onion, which 'bitstack reset' does not remove.
 See: docs/help/bitstack-electrs.txt
 
 Confirmation:

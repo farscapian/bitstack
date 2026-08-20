@@ -7,9 +7,9 @@ What it does:
   Removes the 'bitstack' docker stack (docker stack rm) and waits for its
   services to fully terminate.
 
-Node data under ~/.bitcoin and the electrs database volume are left in
-place -- 'bitstack up' picks up right where it left off. Use 'bitstack
-reset' to discard data instead.
+Node data under ~/.bitcoin and ~/.bitstack (the electrs index and the
+onion key) is left in place -- 'bitstack up' picks up right where it left
+off. Use 'bitstack reset' to discard data instead.
 
 Safe to re-run: a no-op (with a message) if the stack is not running.
 

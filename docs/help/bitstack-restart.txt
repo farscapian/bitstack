@@ -9,10 +9,10 @@ What it does:
   it (see docs/help/bitstack-down.txt and docs/help/bitstack-up.txt for
   what each half does).
 
-Node data under ~/.bitcoin and the electrs database volume are left in
-place throughout -- 'up' picks up right where 'down' left off. The onion
-address is also unaffected (its key lives in a separate docker volume that
-neither command touches).
+Node data under ~/.bitcoin and ~/.bitstack/electrs-db is left in place
+throughout -- 'up' picks up right where 'down' left off. The onion address
+is also unaffected (its key lives in ~/.bitstack/onion, which neither
+command touches).
 
 Help:
   bitstack restart help
