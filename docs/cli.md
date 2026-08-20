@@ -51,7 +51,7 @@ Two entry points at the repo root, replacing the old `deploy-bitcoin-node.sh`:
     is preserved.
   - `bitstack electrs` -- with no further subcommand, prints
     `bitstack help electrs`.
-  - `bitstack electrs tor` -- print the onion address publishing electrs'
+  - `bitstack get-onion` -- print the onion address publishing electrs'
     Electrum RPC port (50001), querying the running `tor` service and
     caching it to `.bitstack-onion` (gitignored, machine-local) for
     `bitstack sparrow` to read later, including from a host that does not
@@ -59,7 +59,7 @@ Two entry points at the repo root, replacing the old `deploy-bitcoin-node.sh`:
   - `bitstack electrs rotate [-f|--force]` -- scale the `tor` service to 0,
     wipe the `tor-hidden-service` volume, scale it back to 1 so Tor
     generates a brand-new v3 address, then cache the new address like
-    `bitstack up`/`bitstack electrs tor` do. Irreversible (the old address
+    `bitstack up`/`bitstack get-onion` do. Irreversible (the old address
     stops resolving once its key is gone); prompts for confirmation unless
     `-f`/`--force`.
   - `bitstack electrs set key <private_key>` -- same stop/wipe/restart

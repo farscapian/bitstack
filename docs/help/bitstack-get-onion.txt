@@ -1,0 +1,29 @@
+bitstack get-onion -- print the onion address publishing electrs' Electrum RPC
+
+Usage:
+  bitstack get-onion
+
+What it does:
+  electrs' Electrum RPC port (50001) is published as a Tor hidden service
+  by the stack's 'tor' service, so a remote Sparrow can reach it without
+  any firewall port-forwarding. This queries the running tor service for
+  its current onion hostname and prints it, caching the result to
+  .bitstack-onion (machine-local, gitignored) for 'bitstack sparrow' to
+  use later -- including from a host that does not run the stack itself
+  (copy that file there, or paste the address it prints).
+
+  If the tor service is not reachable right now, falls back to the
+  last-known address (with a warning) instead of failing outright.
+  Requires the stack to have been deployed at least once ('bitstack up')
+  so a hidden-service key exists.
+
+  The address is stable across restarts and redeploys (the key lives in a
+  docker volume) -- use 'bitstack electrs rotate' or 'bitstack electrs set
+  key' to change it deliberately.
+
+Help:
+  bitstack get-onion help
+  bitstack help get-onion
+
+See also: docs/help/bitstack-electrs.txt, docs/help/bitstack-sparrow.txt,
+docs/help/bitstack-up.txt

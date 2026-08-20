@@ -14,7 +14,7 @@ BITSTACK_NODE_HOME="/home/${BITSTACK_NODE_USER}"
 BITSTACK_BITCOIN_DIR="${BITSTACK_NODE_HOME}/.bitcoin"      # bind-mounted into containers
 BITSTACK_STACK_NAME="bitstack"
 BITSTACK_SPARROW_DIR="/opt/sparrow"
-# Last-known onion hostname 'bitstack up'/'bitstack electrs tor' queried
+# Last-known onion hostname 'bitstack up'/'bitstack get-onion' queried
 # from the running tor service. Lets 'bitstack sparrow' resolve an onion
 # address on a client host that does not run the stack itself (copy this
 # file there).
@@ -132,7 +132,7 @@ bitstack_wait_onion_hostname() {
 
 # Resolve the onion hostname for a remote Sparrow connection: prefer a live
 # query against a running tor service, falling back to the address
-# 'bitstack up'/'bitstack electrs tor' last cached to BITSTACK_ONION_FILE
+# 'bitstack up'/'bitstack get-onion' last cached to BITSTACK_ONION_FILE
 # (e.g. on a client host that does not run the stack itself). Nonzero
 # return if neither is available.
 bitstack_resolve_onion_host() {
