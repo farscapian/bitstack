@@ -659,17 +659,25 @@ cmd_sparrow() {
   bitstack_require_node_user
   bitstack_ensure_sparrow_installed
 
-  if [[ -z "$target" ]]; then
-    if bitstack_electrs_local_reachable; then target="local"; else target="onion"; fi
+  # Always verified against the live service, even for an explicit
+  # target -- writing an unreachable address to Sparrow's config would
+  # otherwise fail silently (Sparrow just sits there unable to connect,
+  # with no indication from this command that it never had a chance).
+  local electrum_url
+  if [[ -z "$target" || "$target" == "local" ]]; then
+    if bitstack_electrs_local_reachable; then
+      target="local"
+      electrum_url="tcp://127.0.0.1:50001"
+    elif [[ "$target" == "local" ]]; then
+      err "Local electrs (tcp://127.0.0.1:50001) is not reachable -- is the stack running on this host? ('bitstack up')"
+    fi
   fi
 
-  local electrum_url
-  if [[ "$target" == "local" ]]; then
-    electrum_url="tcp://127.0.0.1:50001"
-  else
+  if [[ -z "${electrum_url:-}" ]]; then
     local onion_host
     onion_host="$(bitstack_resolve_onion_host)" \
-      || err "No onion endpoint known -- run 'bitstack up' or 'bitstack get-onion' on the electrs host, or copy its ${BITSTACK_ONION_FILE} here."
+      || err "Neither local electrs (tcp://127.0.0.1:50001) nor a known onion endpoint is reachable -- run 'bitstack up' or 'bitstack get-onion' on the electrs host, or copy its ${BITSTACK_ONION_FILE} here."
+    target="onion"
     electrum_url="tcp://${onion_host}:50001"
   fi
 

@@ -24,6 +24,18 @@ What it does:
   otherwise -- e.g. running this on a separate client machine that only has
   Sparrow installed.
 
+  Whichever target is used -- explicit or auto-detected -- is verified
+  live before Sparrow's config is touched: 'local' checks that something
+  actually answers on 127.0.0.1:50001; 'onion' checks the running tor
+  service (or, failing that, the last-known cached address) actually
+  resolves to a hostname. An explicit target that fails its own check
+  errors out immediately rather than falling back to the other one; with
+  no argument, a failed 'local' check falls back to trying 'onion', and
+  if that also fails to resolve, the command errors out instead of ever
+  writing an address nothing is listening on -- a dead config would
+  otherwise fail silently, leaving Sparrow just sitting there unable to
+  connect with no indication why.
+
   Connecting over onion needs no manual Tor/proxy setup: Sparrow detects the
   .onion address in the server URL and starts its own bundled Tor client
   automatically.
