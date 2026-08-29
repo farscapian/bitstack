@@ -33,7 +33,7 @@ services:
       - ${ELECTRS_DB_DIR}:/var/lib/electrs
     ports:
       - target: 50001
-        published: 50001
+        published: 127.0.0.1:50001
         protocol: tcp
         mode: host          # bound on host; Sparrow reaches 127.0.0.1:50001
     networks: [btc]
@@ -50,7 +50,7 @@ services:
     volumes:
       - ${ONION_DIR}:/var/lib/tor/hidden_service
     networks: [btc]
-    deploy:
+    deploy:;
       replicas: 1
       restart_policy:
         condition: any
