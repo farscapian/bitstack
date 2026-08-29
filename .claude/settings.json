@@ -1,0 +1,14 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "d=\"${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null)}\"; for f in \"$d/.agentstack/scripts/claude-session-bootstrap.sh\" \"$d/scripts/claude-session-bootstrap.sh\"; do [ -x \"$f\" ] && { bash \"$f\"; break; }; done; true"
+          }
+        ]
+      }
+    ]
+  }
+}
