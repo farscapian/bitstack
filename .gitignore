@@ -1,3 +1,8 @@
 # Machine-local cache of the last-known Tor onion address, written by
 # 'bitstack up'/'bitstack tor', consumed by 'bitstack wallet'.
 /.bitstack-onion
+
+# Per-machine agentstack identity (CANONICAL_LOCAL_REPO is only correct on the
+# machine that wrote it). Created in the working tree by add-to-project.sh /
+# each agent worktree; never committed. See .agentstack/docs/submodule-integration.md.
+/.agentstack.env
