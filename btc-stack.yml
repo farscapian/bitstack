@@ -33,7 +33,7 @@ services:
       - ${ELECTRS_DB_DIR}:/var/lib/electrs
     ports:
       - target: 50001
-        published: 127.0.0.1:50001
+        published: 50001
         protocol: tcp
         mode: host          # bound on host; Sparrow reaches 127.0.0.1:50001
     networks: [btc]
