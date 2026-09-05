@@ -11,7 +11,7 @@ services:
       - target: 8333
         published: 8333
         protocol: tcp
-        mode: host          # preserve real peer IPs
+        mode: host
     networks: [btc]
     deploy:
       replicas: 1
