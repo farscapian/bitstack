@@ -143,6 +143,14 @@ version resolution, stack-state helpers, onion-hostname/local-reachability
 helpers) lives in [scripts/bitstack-common.sh](../scripts/bitstack-common.sh),
 sourced by both entry points.
 
+Per-app files -- the Dockerfiles, their config/entrypoint inputs, and the
+Sparrow seed config -- live under [app_config/](../app_config/):
+`bitcoind.Dockerfile`, `electrs.Dockerfile`, `tor.Dockerfile`,
+`tor-entrypoint.sh`, `torrc`, `bitcoin.conf`, `sparrow-config.json`.
+`btc-stack.yml` (multi-service orchestration, not one app) stays at the
+repo root. `bitstack_require_siblings` (in `scripts/bitstack-common.sh`)
+checks all of these are present before `bitstack up`/`setup.sh` proceed.
+
 ## Tor hidden service
 
 The `tor` service in `btc-stack.yml` publishes electrs' Electrum RPC port

@@ -97,26 +97,26 @@ cmd_up() {
       --build-arg BITCOIN_VERSION="${bitcoin_version}" \
       --build-arg UID="${node_uid}" --build-arg GID="${node_gid}" \
       -t "local/bitcoind:${bitcoin_version}" \
-      -f "${SCRIPT_DIR}/bitcoind.Dockerfile" "${SCRIPT_DIR}"
+      -f "${SCRIPT_DIR}/app_config/bitcoind.Dockerfile" "${SCRIPT_DIR}/app_config"
 
   bitstack_ensure_image "local/electrs:${electrs_version}" \
     docker build \
       --build-arg ELECTRS_VERSION="${electrs_version}" \
       --build-arg UID="${node_uid}" --build-arg GID="${node_gid}" \
       -t "local/electrs:${electrs_version}" \
-      -f "${SCRIPT_DIR}/electrs.Dockerfile" "${SCRIPT_DIR}"
+      -f "${SCRIPT_DIR}/app_config/electrs.Dockerfile" "${SCRIPT_DIR}/app_config"
 
   bitstack_ensure_image "local/tor:${tor_version}" \
     docker build \
       -t "local/tor:${tor_version}" \
-      -f "${SCRIPT_DIR}/tor.Dockerfile" "${SCRIPT_DIR}"
+      -f "${SCRIPT_DIR}/app_config/tor.Dockerfile" "${SCRIPT_DIR}/app_config"
 
   info "Preparing ${BITSTACK_BITCOIN_DIR}"
   mkdir -p "${BITSTACK_BITCOIN_DIR}"
   chown "${node_uid}:${node_gid}" "${BITSTACK_BITCOIN_DIR}"
   if [[ ! -f "${BITSTACK_BITCOIN_DIR}/bitcoin.conf" ]]; then
     install -o "${node_uid}" -g "${node_gid}" -m 0644 \
-      "${SCRIPT_DIR}/bitcoin.conf" "${BITSTACK_BITCOIN_DIR}/bitcoin.conf"
+      "${SCRIPT_DIR}/app_config/bitcoin.conf" "${BITSTACK_BITCOIN_DIR}/bitcoin.conf"
   fi
 
   # Host bind mounts, not docker volumes, for electrs' index and the tor
@@ -646,7 +646,7 @@ DESKTOP
   mkdir -p "${BITSTACK_NODE_HOME}/.sparrow"
   if [[ ! -f "${BITSTACK_NODE_HOME}/.sparrow/config" ]]; then
     install -o "${node_uid}" -g "${node_gid}" -m 0644 \
-      "${SCRIPT_DIR}/sparrow-config.json" "${BITSTACK_NODE_HOME}/.sparrow/config"
+      "${SCRIPT_DIR}/app_config/sparrow-config.json" "${BITSTACK_NODE_HOME}/.sparrow/config"
   fi
   chown -R "${node_uid}:${node_gid}" "${BITSTACK_NODE_HOME}/.sparrow"
 

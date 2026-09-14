@@ -2,8 +2,8 @@
 # bitstack-common.sh -- shared config and helpers for setup.sh and bitstack.sh.
 #
 # Sourced by both entry points; not meant to be executed directly. Callers must
-# set BITSTACK_ROOT (the repo root, where the sibling Dockerfiles/yml/conf
-# live) before sourcing.
+# set BITSTACK_ROOT (the repo root; app_config/ under it holds the sibling
+# Dockerfiles/conf, btc-stack.yml lives directly under it) before sourcing.
 #
 # shellcheck shell=bash
 
@@ -35,7 +35,7 @@ BITSTACK_SPARROW_FALLBACK="2.5.3"
 # tor-entrypoint.sh change in a way that should invalidate the cached image.
 BITSTACK_TOR_IMAGE_VERSION="2"
 
-BITSTACK_SIBLINGS=(bitcoind.Dockerfile electrs.Dockerfile tor.Dockerfile torrc tor-entrypoint.sh btc-stack.yml bitcoin.conf sparrow-config.json)
+BITSTACK_SIBLINGS=(app_config/bitcoind.Dockerfile app_config/electrs.Dockerfile app_config/tor.Dockerfile app_config/torrc app_config/tor-entrypoint.sh btc-stack.yml app_config/bitcoin.conf app_config/sparrow-config.json)
 
 # Fail unless invoked as BITSTACK_NODE_USER (setup.sh still needs sudo for
 # apt; docker itself is run bare, see bitstack_require_docker_group), but
